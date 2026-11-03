@@ -27,7 +27,7 @@ class PaymentController extends Controller
     {
         abort_unless($request->session()->get('verified_order_reference') === $order->public_reference, 403);
         $validated = $request->validate([
-            'proof' => ['required', 'image', 'mimes:jpeg,png,webp', 'max:5120'],
+            'proof' => ['required', 'image', 'mimes:jpeg,png,jpg,webp', 'max:5120'],
             'reference' => ['nullable', 'string', 'max:120'],
         ]);
         $payment = $order->payments()->where('provider', 'manual_momo')->first();

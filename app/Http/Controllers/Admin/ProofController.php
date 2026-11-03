@@ -24,6 +24,7 @@ class ProofController extends Controller
 
     public function show(PaymentProof $proof)
     {
+        abort_unless(auth()->user() && auth()->user()->is_admin, 403);
         abort_unless(Storage::disk('local')->exists($proof->path), 404);
         return Storage::disk('local')->response($proof->path);
     }
