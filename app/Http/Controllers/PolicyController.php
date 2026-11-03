@@ -15,7 +15,7 @@ class PolicyController extends Controller
 
         abort_if(! $policy, 404);
 
-        return inertia('Policies/Show', [
+        return store_page('Policies/Show', [
             'slug' => $slug,
             'policy' => $policy,
             'contactEmail' => Setting::get('contact_email', ''),

@@ -51,7 +51,7 @@ class ShopController extends Controller
         };
         $products = $query->paginate(12)->withQueryString();
 
-        return inertia('Shop/Index', [
+        return store_page('Shop/Index', [
             'products' => $products,
             'categories' => Category::where('is_active', true)->orderBy('position')->get(),
             'filters' => $filters,

@@ -10,7 +10,7 @@ class DashboardController extends Controller
 {
     public function index()
     {
-        return inertia('Admin/Dashboard', [
+        return store_page('Admin/Dashboard', [
             'summary' => [
                 'orders_today' => Order::whereDate('created_at', Carbon::today())->count(),
                 'awaiting_payment' => Order::whereIn('order_status', ['awaiting_payment', 'payment_review'])->count(),

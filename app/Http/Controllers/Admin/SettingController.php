@@ -24,7 +24,7 @@ class SettingController extends Controller
     {
         $settings = Setting::whereIn('key', self::EDITABLE)->pluck('value', 'key');
 
-        return inertia('Admin/Settings', [
+        return store_page('Admin/Settings', [
             'settings' => $settings,
             'brandLogoUrl' => $settings['brand_logo']
                 ? Storage::disk(config('store.catalog_disk', 'public'))->url($settings['brand_logo'])

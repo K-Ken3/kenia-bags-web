@@ -9,7 +9,7 @@ class OrderLookupController extends Controller
 {
     public function index()
     {
-        return inertia('Order/Lookup');
+        return store_page('Order/Lookup');
     }
 
     public function lookup(Request $request)
@@ -39,7 +39,7 @@ class OrderLookupController extends Controller
                 ->with('error', 'Verify your order number and phone number to view order details.');
         }
 
-        return inertia('Order/Show', [
+        return store_page('Order/Show', [
             'order' => $order->load(['items', 'payments.proofs']),
             'momoPayCode' => $order->payments->first()?->provider === 'manual_momo'
                 ? \App\Models\Setting::get('momo_pay_code')

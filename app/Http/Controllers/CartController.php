@@ -47,7 +47,7 @@ class CartController extends Controller
             ];
         })->filter()->values();
 
-        return inertia('Cart/Index', [
+        return store_page('Cart/Index', [
             'items' => $items,
             'subtotal' => $items->sum('line_total'),
             'deliveryLabel' => Setting::get('delivery_fee_confirmed') === '1'

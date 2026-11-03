@@ -24,8 +24,9 @@ use App\Models\Setting;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Storage;
 
-if (! function_exists('inertia')) {
-    function inertia(string $component, array $props = [])
+// inertiajs/inertia-laravel also registers a global inertia() helper, so this one is named distinctly.
+if (! function_exists('store_page')) {
+    function store_page(string $component, array $props = [])
     {
         $cart = request()->session()->get('cart', []);
         $cartPreview = ProductVariant::with(['product:id,name,slug', 'product.images'])

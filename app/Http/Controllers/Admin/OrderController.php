@@ -29,12 +29,12 @@ class OrderController extends Controller
             ->when($filters['payment_status'] ?? null, fn ($query, $status) => $query->where('payment_status', $status))
             ->latest()->paginate(25)->withQueryString();
 
-        return inertia('Admin/Orders/Index', ['orders' => $orders, 'filters' => $filters]);
+        return store_page('Admin/Orders/Index', ['orders' => $orders, 'filters' => $filters]);
     }
 
     public function show(Order $order)
     {
-        return inertia('Admin/Orders/Show', [
+        return store_page('Admin/Orders/Show', [
             'order' => $order->load(['items', 'payments.proofs']),
             'sandboxEnabled' => app()->environment(['local', 'testing']) && config('payments.sandbox_enabled'),
         ]);

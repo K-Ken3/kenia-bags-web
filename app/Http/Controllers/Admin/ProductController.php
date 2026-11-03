@@ -17,14 +17,14 @@ class ProductController extends Controller
 {
     public function index()
     {
-        return inertia('Admin/Products/Index', [
+        return store_page('Admin/Products/Index', [
             'products' => Product::with('category')->latest()->paginate(20)->withQueryString(),
         ]);
     }
 
     public function create()
     {
-        return inertia('Admin/Products/Form', ['categories' => Category::orderBy('name')->get(), 'product' => null]);
+        return store_page('Admin/Products/Form', ['categories' => Category::orderBy('name')->get(), 'product' => null]);
     }
 
     public function store(ProductUpsertRequest $request)
@@ -58,7 +58,7 @@ class ProductController extends Controller
 
     public function edit(Product $product)
     {
-        return inertia('Admin/Products/Form', [
+        return store_page('Admin/Products/Form', [
             'categories' => Category::orderBy('name')->get(),
             'product' => $product->load(['variants', 'images']),
         ]);

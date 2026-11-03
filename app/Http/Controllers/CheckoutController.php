@@ -48,7 +48,7 @@ class CheckoutController extends Controller
             $methods[] = ['value' => 'sandbox', 'label' => 'SANDBOX — NOT REAL MONEY'];
         }
 
-        return inertia('Checkout/Index', [
+        return store_page('Checkout/Index', [
             'items' => $items,
             'subtotal' => $items->sum('line_total'),
             'deliveryFee' => Setting::integer('delivery_fee_rwf'),

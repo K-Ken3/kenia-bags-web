@@ -11,7 +11,7 @@ class PolicyPageController extends Controller
 {
     public function index()
     {
-        return inertia('Admin/Policies/Index', ['policies' => PolicyPage::orderBy('title')->get()]);
+        return store_page('Admin/Policies/Index', ['policies' => PolicyPage::orderBy('title')->get()]);
     }
 
     public function update(Request $request, PolicyPage $policyPage)

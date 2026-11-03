@@ -10,7 +10,7 @@ class AdminLoginController extends Controller
 {
     public function create()
     {
-        return inertia('Auth/AdminLogin');
+        return store_page('Auth/AdminLogin');
     }
 
     public function store(Request $request)

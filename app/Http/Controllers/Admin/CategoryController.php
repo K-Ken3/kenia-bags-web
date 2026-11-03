@@ -10,14 +10,14 @@ class CategoryController extends Controller
 {
     public function index()
     {
-        return inertia('Admin/Categories/Index', [
+        return store_page('Admin/Categories/Index', [
             'categories' => Category::withCount('products')->orderBy('position')->paginate(20),
         ]);
     }
 
     public function create()
     {
-        return inertia('Admin/Categories/Form', ['category' => null]);
+        return store_page('Admin/Categories/Form', ['category' => null]);
     }
 
     public function store(CategoryUpsertRequest $request)
@@ -33,7 +33,7 @@ class CategoryController extends Controller
 
     public function edit(Category $category)
     {
-        return inertia('Admin/Categories/Form', ['category' => $category]);
+        return store_page('Admin/Categories/Form', ['category' => $category]);
     }
 
     public function update(CategoryUpsertRequest $request, Category $category)

@@ -11,7 +11,7 @@ class HomeController extends Controller
 {
     public function index(Request $request)
     {
-        return inertia('Home', [
+        return store_page('Home', [
             'featured' => Product::with([
                 'images',
                 'category',

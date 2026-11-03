@@ -12,7 +12,7 @@ class ProductController extends Controller
         abort_unless($product->status === 'active', 404);
         $product->load(['category', 'images', 'variants' => fn ($variants) => $variants->where('is_active', true)]);
 
-        return inertia('Products/Show', [
+        return store_page('Products/Show', [
             'product' => $product,
             'related' => Product::with([
                 'images',

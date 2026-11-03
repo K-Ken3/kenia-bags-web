@@ -16,7 +16,7 @@ class ProofController extends Controller
 {
     public function index()
     {
-        return inertia('Admin/Proofs/Index', [
+        return store_page('Admin/Proofs/Index', [
             'proofs' => PaymentProof::with(['order', 'payment'])
                 ->where('status', 'pending')->latest()->paginate(20),
         ]);
