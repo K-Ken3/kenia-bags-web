@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use App\Payments\XentriPayClient;
+use App\Payments\XentriPayProvider;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\ValidationException;
 
@@ -22,21 +23,22 @@ class StoreCheckoutRequest extends FormRequest
                 'string',
                 'max:32',
                 function (string $attribute, mixed $value, \Closure $fail) {
-                    if ($this->input('payment_method') !== 'xentripay_momo') {
+                    $method = (string) $this->input('payment_method');
+                    if (! in_array($method, ['xentripay_momo', 'xentripay_airtel'], true)) {
                         return;
                     }
 
                     try {
-                        XentriPayClient::normalizePhone((string) $value);
+                        XentriPayClient::normalizePhone((string) $value, $method);
                     } catch (ValidationException) {
-                        $fail('Enter a valid Rwandan mobile money number, for example 0780 000 000.');
+                        $fail(XentriPayClient::phoneErrorMessage($method));
                     }
                 },
             ],
-            'customer_email' => ['nullable', 'email', 'max:255', 'required_if:payment_method,xentripay_momo'],
+            'customer_email' => ['nullable', 'email', 'max:255', 'required_if:payment_method,xentripay_momo,xentripay_airtel,xentripay_card'],
             'delivery_location' => ['required', 'string', 'max:500'],
             'notes' => ['nullable', 'string', 'max:1000'],
-            'payment_method' => ['required', 'in:manual_momo,sandbox,xentripay_momo'],
+            'payment_method' => ['required', 'in:manual_momo,sandbox,'.implode(',', XentriPayProvider::METHODS)],
             'idempotency_key' => ['required', 'uuid'],
         ];
     }

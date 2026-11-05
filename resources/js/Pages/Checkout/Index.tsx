@@ -6,7 +6,9 @@ import StoreHeader from '../../Components/StoreHeader';
 export default function CheckoutIndex({ items = [], subtotal = 0, deliveryFee = 0, deliveryLabel, paymentMethods = [], idempotencyKey, canPlaceOrder = false, flash, errors, brandName, cartCount, contactEmail, contactPhone }: any) {
     const [submitting, setSubmitting] = React.useState(false);
     const [paymentMethod, setPaymentMethod] = React.useState<string>(paymentMethods[0]?.value || '');
-    const emailRequired = paymentMethod === 'xentripay_momo';
+    const isMobileMoney = ['xentripay_momo', 'xentripay_airtel'].includes(paymentMethod);
+    const isCard = paymentMethod === 'xentripay_card';
+    const emailRequired = isMobileMoney || isCard;
 
     return (
         <div className="min-h-screen bg-[var(--ivory)]">
@@ -45,7 +47,7 @@ export default function CheckoutIndex({ items = [], subtotal = 0, deliveryFee = 
                         <input id="customer_name" type="text" name="customer_name" autoComplete="name" required maxLength={120} className="store-input" />
                     </div>
                     <div>
-                        <label htmlFor="customer_email" className="mb-2 block text-xs font-semibold uppercase tracking-wider text-[var(--chocolate)]">Email {emailRequired ? '(required for mobile money)' : '(optional)'}</label>
+                        <label htmlFor="customer_email" className="mb-2 block text-xs font-semibold uppercase tracking-wider text-[var(--chocolate)]">Email {emailRequired ? '(required for online payment)' : '(optional)'}</label>
                         <input id="customer_email" type="email" name="customer_email" autoComplete="email" required={emailRequired} className="store-input" />
                     </div>
                     <div>
@@ -71,8 +73,11 @@ export default function CheckoutIndex({ items = [], subtotal = 0, deliveryFee = 
                             <p className="border border-[var(--beige)] bg-[var(--sand)] p-4 text-sm text-[var(--chocolate)]">Checkout is temporarily unavailable while the store owner configures a payment method. No payment details or service have been invented.</p>
                         )}
                     </fieldset>
-                    {paymentMethod === 'xentripay_momo' && (
-                        <p className="border border-[var(--beige)] bg-[var(--sand)] p-4 text-sm text-[var(--chocolate)]">After placing the order, approve the mobile money prompt on your phone. The order is confirmed only after XentriPay reports the payment as successful.</p>
+                    {isMobileMoney && (
+                        <p className="border border-[var(--beige)] bg-[var(--sand)] p-4 text-sm text-[var(--chocolate)]">After placing the order, approve the {paymentMethod === 'xentripay_airtel' ? 'Airtel Money' : 'mobile money'} prompt on your phone. The order is confirmed only after XentriPay reports the payment as successful.</p>
+                    )}
+                    {isCard && (
+                        <p className="border border-[var(--beige)] bg-[var(--sand)] p-4 text-sm text-[var(--chocolate)]">After placing the order, you will be redirected to XentriPay's secure card page to pay with Visa or Mastercard. The order is confirmed only after XentriPay reports the payment as successful.</p>
                     )}
                     {deliveryLabel && <p className="border border-[var(--beige)] bg-[var(--sand)] p-4 text-sm text-[var(--chocolate)]">Checkout is unavailable until the store confirms its delivery fee. The amount above is not a final order total.</p>}
                     <button type="submit" disabled={submitting || !canPlaceOrder} className="store-primary-button w-full disabled:cursor-not-allowed disabled:opacity-50">

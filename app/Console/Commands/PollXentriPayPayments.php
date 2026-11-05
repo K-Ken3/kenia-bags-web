@@ -22,7 +22,7 @@ class PollXentriPayPayments extends Command
             return self::SUCCESS;
         }
 
-        $payments = Payment::where('provider', 'xentripay_momo')
+        $payments = Payment::whereIn('provider', XentriPayProvider::METHODS)
             ->where('status', 'pending')
             ->whereNotNull('reference')
             ->where('created_at', '>=', now()->subDay())

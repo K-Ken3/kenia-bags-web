@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Order;
+use App\Payments\XentriPayProvider;
 use Illuminate\Http\Request;
 
 class OrderLookupController extends Controller
@@ -41,7 +42,7 @@ class OrderLookupController extends Controller
 
         $order->load(['items', 'payments.proofs']);
         $xentriPayment = $order->payments
-            ->where('provider', 'xentripay_momo')
+            ->whereIn('provider', XentriPayProvider::METHODS)
             ->sortByDesc('id')
             ->first();
 
@@ -52,8 +53,11 @@ class OrderLookupController extends Controller
                 : null,
             'xentriPayEnabled' => (bool) config('payments.xentripay.enabled') && filled(config('payments.xentripay.api_key')),
             'xentriPay' => $xentriPayment ? [
+                'method' => XentriPayProvider::methodFor($xentriPayment),
+                'label' => XentriPayProvider::label(XentriPayProvider::methodFor($xentriPayment)),
                 'status' => $xentriPayment->status,
                 'reference' => $xentriPayment->reference,
+                'checkout_url' => $xentriPayment->checkout_url,
                 'raw_status' => $xentriPayment->raw_status,
                 'sandbox' => str_contains((string) config('payments.xentripay.base_url'), 'test.'),
             ] : null,

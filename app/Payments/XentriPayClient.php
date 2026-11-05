@@ -58,7 +58,7 @@ class XentriPayClient
     /**
      * @return array{0: string, 1: string} Local 07XXXXXXXX number and 250XXXXXXXXX MSISDN.
      */
-    public static function normalizePhone(string $phone): array
+    public static function normalizePhone(string $phone, ?string $method = null): array
     {
         $digits = (string) preg_replace('/\D+/', '', $phone);
 
@@ -68,13 +68,29 @@ class XentriPayClient
         if (strlen($digits) === 9) {
             $digits = '0'.$digits;
         }
-        if (! preg_match('/^07[2389]\d{7}$/', $digits)) {
+
+        $pattern = match ($method) {
+            'xentripay_momo' => '/^07[89]\d{7}$/',
+            'xentripay_airtel' => '/^07[23]\d{7}$/',
+            default => '/^07[2389]\d{7}$/',
+        };
+
+        if (! preg_match($pattern, $digits)) {
             throw ValidationException::withMessages([
-                'customer_phone' => 'Enter a valid Rwandan mobile money number, for example 0780 000 000.',
+                'customer_phone' => self::phoneErrorMessage($method),
             ]);
         }
 
         return [$digits, '250'.substr($digits, 1)];
+    }
+
+    public static function phoneErrorMessage(?string $method): string
+    {
+        return match ($method) {
+            'xentripay_momo' => 'Enter a valid MTN Mobile Money number, for example 0780 000 000.',
+            'xentripay_airtel' => 'Enter a valid Airtel Money number, for example 0730 000 000.',
+            default => 'Enter a valid Rwandan mobile money number, for example 0780 000 000.',
+        };
     }
 
     private function request(): PendingRequest

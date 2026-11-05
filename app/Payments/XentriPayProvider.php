@@ -15,10 +15,39 @@ use Illuminate\Validation\ValidationException;
 
 class XentriPayProvider implements PaymentProvider
 {
+    public const METHODS = ['xentripay_momo', 'xentripay_airtel', 'xentripay_card'];
+
+    public const LABELS = [
+        'xentripay_momo' => 'MTN Mobile Money',
+        'xentripay_airtel' => 'Airtel Money',
+        'xentripay_card' => 'Visa / Mastercard',
+    ];
+
     public function __construct(
         private XentriPayClient $client,
         private SettleXentriPayPayment $settle,
     ) {}
+
+    public static function isXentri(string $method): bool
+    {
+        return in_array($method, self::METHODS, true);
+    }
+
+    public static function label(?string $method): string
+    {
+        return self::LABELS[$method] ?? 'Online payment';
+    }
+
+    public static function methodFor(Payment $payment): string
+    {
+        foreach ([$payment->method, $payment->provider] as $method) {
+            if (is_string($method) && self::isXentri($method)) {
+                return $method;
+            }
+        }
+
+        return 'xentripay_momo';
+    }
 
     public function initiate(Payment $payment): array
     {
@@ -27,38 +56,50 @@ class XentriPayProvider implements PaymentProvider
         }
 
         $order = $payment->order;
+        $method = self::methodFor($payment);
         if (! $order->customer_email) {
-            throw new PaymentProviderException('An email address is required to start a mobile money payment.');
+            throw new PaymentProviderException('An email address is required to start an online payment.');
         }
         if ((int) $order->total_rwf < 100) {
             throw new PaymentProviderException('XentriPay requires an order total of at least RWF 100.');
         }
 
-        [$cnumber, $msisdn] = XentriPayClient::normalizePhone($order->customer_phone);
         $customerRef = $payment->reference ?: $order->public_reference.'-'.$payment->id;
-
-        $data = $this->client->initiate([
+        $payload = [
             'email' => $order->customer_email,
             'cname' => $order->customer_name,
             'amount' => (int) $order->total_rwf,
-            'cnumber' => $cnumber,
-            'msisdn' => $msisdn,
             'currency' => 'RWF',
-            'pmethod' => 'momo',
             'customerRef' => $customerRef,
             'chargesIncluded' => (bool) config('payments.xentripay.charges_included', true),
-        ]);
+        ];
+
+        if ($method === 'xentripay_card') {
+            $returnUrl = route('xentripay.return', $order);
+            $payload['pmethod'] = 'cc';
+            $payload['redirecturl'] = $returnUrl;
+            $payload['returl'] = $returnUrl;
+        } else {
+            [$cnumber, $msisdn] = XentriPayClient::normalizePhone($order->customer_phone, $method);
+            $payload['pmethod'] = 'momo';
+            $payload['cnumber'] = $cnumber;
+            $payload['msisdn'] = $msisdn;
+        }
+
+        $data = $this->client->initiate($payload);
+        $checkoutUrl = $method === 'xentripay_card' ? self::gatewayUrl($data) : null;
 
         $payment->update([
             'reference' => $customerRef,
             'provider_reference' => $data['refid'] ?? $payment->provider_reference,
+            'checkout_url' => $checkoutUrl,
             'raw_status' => 'xentripay.initiated',
         ]);
 
         return [
             'customer_ref' => $customerRef,
             'refid' => $data['refid'] ?? null,
-            'url' => $data['url'] ?? null,
+            'checkout_url' => $checkoutUrl,
         ];
     }
 
@@ -90,13 +131,13 @@ class XentriPayProvider implements PaymentProvider
         $payment = null;
         if (is_string($customerRef) && $customerRef !== '') {
             $payment = Payment::with('order')
-                ->where('provider', 'xentripay_momo')
+                ->whereIn('provider', self::METHODS)
                 ->where('reference', $customerRef)
                 ->first();
         }
         if (! $payment && is_string($providerRef) && $providerRef !== '') {
             $payment = Payment::with('order')
-                ->where('provider', 'xentripay_momo')
+                ->whereIn('provider', self::METHODS)
                 ->where(fn ($query) => $query
                     ->where('provider_reference', $providerRef)
                     ->orWhere('reference', $providerRef))
@@ -163,6 +204,22 @@ class XentriPayProvider implements PaymentProvider
 
             throw $exception;
         }
+    }
+
+    private static function gatewayUrl(array $data): string
+    {
+        $url = $data['url']
+            ?? data_get($data, 'data.url')
+            ?? $data['redirect_url']
+            ?? $data['payment_url']
+            ?? data_get($data, 'data.redirect_url');
+
+        $scheme = is_string($url) ? strtolower((string) parse_url($url, PHP_URL_SCHEME)) : '';
+        if (! is_string($url) || ! filter_var($url, FILTER_VALIDATE_URL) || ! in_array($scheme, ['http', 'https'], true)) {
+            throw new PaymentProviderException('XentriPay did not return a card payment page.');
+        }
+
+        return $url;
     }
 
     public static function mapStatus(string $status, string $event = ''): string

@@ -6,6 +6,7 @@ use App\Exceptions\PaymentProviderException;
 use App\Models\Order;
 use App\Models\Payment;
 use App\Models\ProductVariant;
+use App\Payments\XentriPayProvider;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -21,7 +22,7 @@ class SettleXentriPayPayment
             $payment = Payment::lockForUpdate()->findOrFail($payment->id);
             $order = Order::with('items')->lockForUpdate()->findOrFail($payment->order_id);
 
-            if ($payment->provider !== 'xentripay_momo') {
+            if (! XentriPayProvider::isXentri((string) $payment->provider)) {
                 throw new PaymentProviderException('This is not a XentriPay payment.');
             }
             if ($payment->currency !== 'RWF' || (int) $payment->amount_rwf !== (int) $order->total_rwf) {

@@ -11,14 +11,17 @@ use Illuminate\Support\Facades\Log;
 
 class InitiateXentriPayCollection
 {
-    public function handle(Order $order, Payment $payment): void
+    /**
+     * @return array{customer_ref: string, refid: ?string, checkout_url: ?string}
+     */
+    public function handle(Order $order, Payment $payment): array
     {
         try {
-            app(XentriPayProvider::class)->initiate($payment);
+            return app(XentriPayProvider::class)->initiate($payment);
         } catch (\Throwable $exception) {
             $rawMessage = $exception instanceof PaymentProviderException
                 ? $exception->getMessage()
-                : 'The mobile money request could not be started. Please try again.';
+                : 'The online payment could not be started. Please try again.';
 
             if ($exception instanceof PaymentProviderException) {
                 Log::warning('XentriPay collection initiation rejected.', [
@@ -39,7 +42,7 @@ class InitiateXentriPayCollection
                 $publicMessage = 'XentriPay has not approved a charge setting for this merchant account. Ask XentriPay to enable collections, then retry.';
             }
             if (! app()->environment(['local', 'testing'])) {
-                $publicMessage = 'Mobile money is temporarily unavailable. Please try again or choose another payment method.';
+                $publicMessage = 'Online payment is temporarily unavailable. Please try again or choose another payment method.';
             }
 
             DB::transaction(function () use ($order, $payment, $rawMessage) {

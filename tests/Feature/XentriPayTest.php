@@ -218,6 +218,160 @@ class XentriPayTest extends StoreTestCase
         $this->assertSame(4, $variant->fresh()->stock_quantity);
     }
 
+    public function test_airtel_checkout_uses_the_mobile_money_channel(): void
+    {
+        Http::fake([
+            'https://merchant.test.xentripay.com/api/collections/initiate' => Http::response([
+                'success' => 1,
+                'retcode' => 0,
+                'refid' => 'REF-AIRTEL',
+            ]),
+        ]);
+        [, , $variant] = $this->createStoreProduct(price: 42000, stock: 5);
+        $this->post('/cart/add', ['variant_id' => $variant->id, 'quantity' => 1])->assertRedirect();
+
+        $this->post('/checkout', $this->xentriPayPayload([
+            'payment_method' => 'xentripay_airtel',
+            'customer_phone' => '+250 730 123 456',
+        ]))->assertRedirect()->assertSessionHas('success');
+
+        $order = Order::with('payments')->firstOrFail();
+        $this->assertSame('xentripay_airtel', $order->payments->firstOrFail()->provider);
+
+        Http::assertSent(function (ClientRequest $request) {
+            $data = $request->data();
+
+            return $data['pmethod'] === 'momo'
+                && $data['cnumber'] === '0730123456'
+                && $data['msisdn'] === '250730123456';
+        });
+    }
+
+    public function test_each_mobile_money_method_rejects_the_other_network(): void
+    {
+        Http::fake();
+        [, , $variant] = $this->createStoreProduct();
+        $this->post('/cart/add', ['variant_id' => $variant->id, 'quantity' => 1])->assertRedirect();
+
+        $this->post('/checkout', $this->xentriPayPayload([
+            'payment_method' => 'xentripay_momo',
+            'customer_phone' => '0730123456',
+        ]))->assertSessionHasErrors('customer_phone');
+
+        $this->post('/checkout', $this->xentriPayPayload([
+            'payment_method' => 'xentripay_airtel',
+            'customer_phone' => '0780123456',
+        ]))->assertSessionHasErrors('customer_phone');
+
+        $this->assertDatabaseCount('orders', 0);
+    }
+
+    public function test_card_checkout_redirects_to_the_gateway_and_stores_the_url(): void
+    {
+        Http::fake([
+            'https://merchant.test.xentripay.com/api/collections/initiate' => Http::response([
+                'success' => 1,
+                'retcode' => 0,
+                'refid' => 'REF-CARD',
+                'url' => 'https://secure.xentripay.test/pay/abc',
+            ]),
+        ]);
+        [, , $variant] = $this->createStoreProduct(price: 42000, stock: 5);
+        $this->post('/cart/add', ['variant_id' => $variant->id, 'quantity' => 1])->assertRedirect();
+
+        $this->post('/checkout', $this->xentriPayPayload(['payment_method' => 'xentripay_card']))
+            ->assertRedirect('https://secure.xentripay.test/pay/abc');
+
+        $order = Order::with('payments')->firstOrFail();
+        $payment = $order->payments->firstOrFail();
+        $this->assertSame('xentripay_card', $payment->provider);
+        $this->assertSame('https://secure.xentripay.test/pay/abc', $payment->checkout_url);
+        $this->assertSame('REF-CARD', $payment->provider_reference);
+        $this->assertSame('awaiting_payment', $order->order_status);
+
+        Http::assertSent(function (ClientRequest $request) use ($order) {
+            $data = $request->data();
+
+            return $data['pmethod'] === 'cc'
+                && $data['redirecturl'] === route('xentripay.return', $order)
+                && $data['returl'] === route('xentripay.return', $order)
+                && ! isset($data['msisdn']);
+        });
+    }
+
+    public function test_card_gateway_return_settles_the_payment(): void
+    {
+        [$order, $payment, $variant] = $this->createXentriPayOrder(method: 'xentripay_card');
+        $payment->update(['checkout_url' => 'https://secure.xentripay.test/pay/abc']);
+        Http::fake([
+            'https://merchant.test.xentripay.com/api/collections/status/*' => Http::response([
+                'customerRef' => $payment->reference,
+                'status' => 'SUCCESS',
+            ]),
+        ]);
+
+        $this->withSession(['verified_order_reference' => $order->public_reference])
+            ->get('/order/'.$order->public_reference.'/xentripay/return')
+            ->assertRedirect()
+            ->assertSessionHas('success');
+
+        $this->assertSame('paid', $order->fresh()->payment_status);
+        $this->assertSame('confirmed', $order->fresh()->order_status);
+        $this->assertSame(4, $variant->fresh()->stock_quantity);
+    }
+
+    public function test_failed_card_payment_retries_with_a_new_gateway_redirect(): void
+    {
+        [$order, $payment] = $this->createXentriPayOrder(method: 'xentripay_card');
+        Http::fake([
+            'https://merchant.test.xentripay.com/api/collections/status/*' => Http::response([
+                'customerRef' => $payment->reference,
+                'status' => 'FAILED',
+            ]),
+        ]);
+        $this->withSession(['verified_order_reference' => $order->public_reference])
+            ->post('/order/'.$order->public_reference.'/xentripay/check')
+            ->assertRedirect();
+
+        Http::fake([
+            'https://merchant.test.xentripay.com/api/collections/initiate' => Http::response([
+                'success' => 1,
+                'retcode' => 0,
+                'refid' => 'REF-CARD-2',
+                'url' => 'https://secure.xentripay.test/pay/new',
+            ]),
+        ]);
+        $this->post('/order/'.$order->public_reference.'/xentripay/retry')
+            ->assertRedirect('https://secure.xentripay.test/pay/new');
+
+        $latest = $order->payments()->latest('id')->firstOrFail();
+        $this->assertSame('xentripay_card', $latest->provider);
+        $this->assertSame('https://secure.xentripay.test/pay/new', $latest->checkout_url);
+        $this->assertSame('pending', $order->fresh()->payment_status);
+    }
+
+    public function test_webhook_settles_an_airtel_payment(): void
+    {
+        [$order, , $variant] = $this->createXentriPayOrder(method: 'xentripay_airtel');
+        $body = json_encode([
+            'event' => 'COLLECTION_SUCCESSFUL',
+            'data' => [
+                'status' => 'SUCCESSFUL',
+                'reference' => 'REF-1',
+                'amount' => 42000,
+                'currency' => 'RWF',
+            ],
+            'idempotencyKey' => 'idem-xentri-airtel',
+        ]);
+
+        $this->postRawWebhook($body, 'sha256='.hash_hmac('sha256', $body, 'whsec-test'))
+            ->assertOk()
+            ->assertJson(['processed' => true]);
+
+        $this->assertSame('paid', $order->fresh()->payment_status);
+        $this->assertSame(4, $variant->fresh()->stock_quantity);
+    }
+
     private function xentriPayPayload(array $overrides = []): array
     {
         return array_merge([
@@ -231,7 +385,7 @@ class XentriPayTest extends StoreTestCase
         ], $overrides);
     }
 
-    private function createXentriPayOrder(int $stock = 5): array
+    private function createXentriPayOrder(int $stock = 5, string $method = 'xentripay_momo'): array
     {
         [, , $variant] = $this->createStoreProduct(price: 42000, stock: $stock);
         $variant->update(['reserved' => 1]);
@@ -264,8 +418,8 @@ class XentriPayTest extends StoreTestCase
 
         $payment = Payment::create([
             'order_id' => $order->id,
-            'method' => 'xentripay_momo',
-            'provider' => 'xentripay_momo',
+            'method' => $method,
+            'provider' => $method,
             'amount' => 42000,
             'amount_rwf' => 42000,
             'currency' => 'RWF',

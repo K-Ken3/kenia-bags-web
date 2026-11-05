@@ -13,6 +13,7 @@ export default function OrderShow({ order, momoPayCode, xentriPay, xentriPayEnab
     const xentriOpen = Boolean(xentriPay)
         && ['awaiting_payment', 'payment_review'].includes(order.order_status)
         && ['pending', 'failed', 'expired'].includes(xentriPay.status);
+    const isCard = xentriPay?.method === 'xentripay_card';
 
     return (
         <div className="min-h-screen bg-[var(--ivory)]">
@@ -28,22 +29,29 @@ export default function OrderShow({ order, momoPayCode, xentriPay, xentriPayEnab
                 </div>
                 {xentriOpen && (
                     <section className="mb-5 border border-[var(--beige)] bg-[var(--sand)] p-5">
-                        <h2 className="font-semibold text-[var(--chocolate)]">Mobile Money payment — XentriPay</h2>
+                        <h2 className="font-semibold text-[var(--chocolate)]">{xentriPay.label || 'Online payment'} — XentriPay</h2>
                         {xentriPay.sandbox && (
                             <p className="mt-2 text-xs font-semibold uppercase tracking-wider text-[var(--chocolate)]">Sandbox — no real money will be charged</p>
                         )}
                         {xentriPay.status === 'failed' ? (
                             <>
-                                <p className="mt-2">The last mobile money request was not completed. You can try again.</p>
+                                <p className="mt-2">The last {isCard ? 'card' : 'mobile money'} request was not completed. You can try again.</p>
                                 <form action={`/order/${order.public_reference}/xentripay/retry`} method="post" className="mt-4">
                                     <input type="hidden" name="_token" value={csrfToken} />
-                                    <button className="store-primary-button" disabled={!xentriPayEnabled}>Retry mobile money payment</button>
+                                    <button className="store-primary-button" disabled={!xentriPayEnabled}>Retry {isCard ? 'card' : 'mobile money'} payment</button>
                                 </form>
                             </>
                         ) : (
                             <>
-                                <p className="mt-2">Approve the payment prompt sent to <strong>{order.customer_phone}</strong> for <strong>RWF {new Intl.NumberFormat('en').format(order.total_rwf)}</strong>.</p>
+                                {isCard ? (
+                                    <p className="mt-2">Pay <strong>RWF {new Intl.NumberFormat('en').format(order.total_rwf)}</strong> with Visa or Mastercard on XentriPay's secure payment page.</p>
+                                ) : (
+                                    <p className="mt-2">Approve the payment prompt sent to <strong>{order.customer_phone}</strong> for <strong>RWF {new Intl.NumberFormat('en').format(order.total_rwf)}</strong>.</p>
+                                )}
                                 <p className="mt-2 text-sm">Your order is confirmed only after XentriPay reports the payment as successful.</p>
+                                {isCard && xentriPay.checkout_url && (
+                                    <a href={xentriPay.checkout_url} className="store-primary-button mt-4 inline-block">Open card payment page</a>
+                                )}
                                 {xentriPay.reference && (
                                     <form action={`/order/${order.public_reference}/xentripay/check`} method="post" className="mt-4">
                                         <input type="hidden" name="_token" value={csrfToken} />

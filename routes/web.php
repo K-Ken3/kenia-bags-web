@@ -116,6 +116,7 @@ Route::get('/order/{order:public_reference}/proof', [PaymentController::class, '
 Route::post('/order/{order:public_reference}/proof', [PaymentController::class, 'uploadProof'])->middleware('throttle:5,1')->name('payment.proof');
 Route::post('/order/{order:public_reference}/xentripay/check', [XentriPayController::class, 'check'])->middleware('throttle:10,1')->name('xentripay.check');
 Route::post('/order/{order:public_reference}/xentripay/retry', [XentriPayController::class, 'retry'])->middleware('throttle:5,1')->name('xentripay.retry');
+Route::get('/order/{order:public_reference}/xentripay/return', [XentriPayController::class, 'returnFromGateway'])->middleware('throttle:20,1')->name('xentripay.return');
 
 // Policies
 Route::get('/policies/{slug}', [PolicyController::class, 'show'])->name('policies.show');
