@@ -13,6 +13,7 @@ class PaymentManager
         return match ($name) {
             'manual_momo' => app(ManualMomoProvider::class),
             'sandbox' => app(SandboxProvider::class),
+            'xentripay_momo' => app(XentriPayProvider::class),
             default => $this->unavailable($name),
         };
     }

@@ -3,9 +3,12 @@
 namespace App\Http\Controllers;
 
 use App\Actions\CreateStoreOrder;
+use App\Actions\InitiateXentriPayCollection;
+use App\Exceptions\PaymentProviderException;
 use App\Http\Requests\StoreCheckoutRequest;
 use App\Models\ProductVariant;
 use App\Models\Setting;
+use App\Payments\XentriPayClient;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -47,6 +50,9 @@ class CheckoutController extends Controller
         if (app()->environment(['local', 'testing']) && config('payments.sandbox_enabled')) {
             $methods[] = ['value' => 'sandbox', 'label' => 'SANDBOX — NOT REAL MONEY'];
         }
+        if ($this->xentriPayEnabled()) {
+            $methods[] = ['value' => 'xentripay_momo', 'label' => $this->xentriPayLabel()];
+        }
 
         return store_page('Checkout/Index', [
             'items' => $items,
@@ -62,7 +68,7 @@ class CheckoutController extends Controller
         ]);
     }
 
-    public function store(StoreCheckoutRequest $request, CreateStoreOrder $createOrder)
+    public function store(StoreCheckoutRequest $request, CreateStoreOrder $createOrder, InitiateXentriPayCollection $initiate)
     {
         $validated = $request->validated();
         $enabledMethods = collect($this->availablePaymentMethods())->pluck('value');
@@ -85,8 +91,22 @@ class CheckoutController extends Controller
         $request->session()->put('verified_order_reference', $order->public_reference);
         $request->session()->forget('checkout_idempotency_key');
 
-        return redirect()->route('order.show', $order)
-            ->with('success', 'Your order has been received.');
+        $message = 'Your order has been received.';
+
+        if ($validated['payment_method'] === 'xentripay_momo') {
+            $payment = $order->payments()->where('provider', 'xentripay_momo')->latest('id')->first();
+            if ($payment && $payment->status === 'pending' && ! $payment->reference) {
+                try {
+                    $initiate->handle($order, $payment);
+                    $message = 'Your order has been received. Approve the mobile money prompt on your phone.';
+                } catch (PaymentProviderException $exception) {
+                    return redirect()->route('order.show', $order)
+                        ->with('error', 'Your order was created, but the mobile money request could not be started: '.$exception->getMessage());
+                }
+            }
+        }
+
+        return redirect()->route('order.show', $order)->with('success', $message);
     }
 
     private function availablePaymentMethods(): array
@@ -99,7 +119,22 @@ class CheckoutController extends Controller
         if (app()->environment(['local', 'testing']) && config('payments.sandbox_enabled')) {
             $methods[] = ['value' => 'sandbox'];
         }
+        if ($this->xentriPayEnabled()) {
+            $methods[] = ['value' => 'xentripay_momo'];
+        }
 
         return $methods;
+    }
+
+    private function xentriPayEnabled(): bool
+    {
+        return (bool) config('payments.xentripay.enabled') && filled(config('payments.xentripay.api_key'));
+    }
+
+    private function xentriPayLabel(): string
+    {
+        return app(XentriPayClient::class)->sandbox()
+            ? 'Mobile Money — XentriPay (sandbox, no real money)'
+            : 'Mobile Money — XentriPay';
     }
 }

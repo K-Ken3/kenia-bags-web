@@ -39,11 +39,24 @@ class OrderLookupController extends Controller
                 ->with('error', 'Verify your order number and phone number to view order details.');
         }
 
+        $order->load(['items', 'payments.proofs']);
+        $xentriPayment = $order->payments
+            ->where('provider', 'xentripay_momo')
+            ->sortByDesc('id')
+            ->first();
+
         return store_page('Order/Show', [
-            'order' => $order->load(['items', 'payments.proofs']),
+            'order' => $order,
             'momoPayCode' => $order->payments->first()?->provider === 'manual_momo'
                 ? \App\Models\Setting::get('momo_pay_code')
                 : null,
+            'xentriPayEnabled' => (bool) config('payments.xentripay.enabled') && filled(config('payments.xentripay.api_key')),
+            'xentriPay' => $xentriPayment ? [
+                'status' => $xentriPayment->status,
+                'reference' => $xentriPayment->reference,
+                'raw_status' => $xentriPayment->raw_status,
+                'sandbox' => str_contains((string) config('payments.xentripay.base_url'), 'test.'),
+            ] : null,
             'whatsappNumber' => \App\Models\Setting::get('whatsapp_number'),
         ]);
     }

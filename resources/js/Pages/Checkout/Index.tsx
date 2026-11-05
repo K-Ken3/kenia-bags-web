@@ -5,6 +5,8 @@ import StoreHeader from '../../Components/StoreHeader';
 
 export default function CheckoutIndex({ items = [], subtotal = 0, deliveryFee = 0, deliveryLabel, paymentMethods = [], idempotencyKey, canPlaceOrder = false, flash, errors, brandName, cartCount, contactEmail, contactPhone }: any) {
     const [submitting, setSubmitting] = React.useState(false);
+    const [paymentMethod, setPaymentMethod] = React.useState<string>(paymentMethods[0]?.value || '');
+    const emailRequired = paymentMethod === 'xentripay_momo';
 
     return (
         <div className="min-h-screen bg-[var(--ivory)]">
@@ -43,8 +45,8 @@ export default function CheckoutIndex({ items = [], subtotal = 0, deliveryFee = 
                         <input id="customer_name" type="text" name="customer_name" autoComplete="name" required maxLength={120} className="store-input" />
                     </div>
                     <div>
-                        <label htmlFor="customer_email" className="mb-2 block text-xs font-semibold uppercase tracking-wider text-[var(--chocolate)]">Email (optional)</label>
-                        <input id="customer_email" type="email" name="customer_email" autoComplete="email" className="store-input" />
+                        <label htmlFor="customer_email" className="mb-2 block text-xs font-semibold uppercase tracking-wider text-[var(--chocolate)]">Email {emailRequired ? '(required for mobile money)' : '(optional)'}</label>
+                        <input id="customer_email" type="email" name="customer_email" autoComplete="email" required={emailRequired} className="store-input" />
                     </div>
                     <div>
                         <label htmlFor="customer_phone" className="mb-2 block text-xs font-semibold uppercase tracking-wider text-[var(--chocolate)]">Phone number</label>
@@ -62,13 +64,16 @@ export default function CheckoutIndex({ items = [], subtotal = 0, deliveryFee = 
                         <legend className="mb-2 text-xs font-semibold uppercase tracking-wider text-[var(--chocolate)]">Payment method</legend>
                         {paymentMethods.length > 0 ? paymentMethods.map((method: any, index: number) => (
                             <label key={method.value} className="flex min-h-12 items-center gap-3 border border-[var(--hairline)] bg-white px-4">
-                                <input type="radio" name="payment_method" value={method.value} required defaultChecked={index === 0} />
+                                <input type="radio" name="payment_method" value={method.value} required defaultChecked={index === 0} onChange={() => setPaymentMethod(method.value)} />
                                 <span>{method.label}</span>
                             </label>
                         )) : (
                             <p className="border border-[var(--beige)] bg-[var(--sand)] p-4 text-sm text-[var(--chocolate)]">Checkout is temporarily unavailable while the store owner configures a payment method. No payment details or service have been invented.</p>
                         )}
                     </fieldset>
+                    {paymentMethod === 'xentripay_momo' && (
+                        <p className="border border-[var(--beige)] bg-[var(--sand)] p-4 text-sm text-[var(--chocolate)]">After placing the order, approve the mobile money prompt on your phone. The order is confirmed only after XentriPay reports the payment as successful.</p>
+                    )}
                     {deliveryLabel && <p className="border border-[var(--beige)] bg-[var(--sand)] p-4 text-sm text-[var(--chocolate)]">Checkout is unavailable until the store confirms its delivery fee. The amount above is not a final order total.</p>}
                     <button type="submit" disabled={submitting || !canPlaceOrder} className="store-primary-button w-full disabled:cursor-not-allowed disabled:opacity-50">
                         {submitting ? 'Placing order…' : 'Place order'}

@@ -4,11 +4,15 @@ import StoreFooter from '../../Components/StoreFooter';
 import StoreHeader from '../../Components/StoreHeader';
 import StatusBadge from '../../Components/StatusBadge';
 
-export default function OrderShow({ order, momoPayCode, whatsappNumber, flash, errors, brandName, cartCount, contactEmail, contactPhone }: any) {
+export default function OrderShow({ order, momoPayCode, xentriPay, xentriPayEnabled, whatsappNumber, flash, errors, brandName, cartCount, contactEmail, contactPhone }: any) {
     const whatsappDigits = String(whatsappNumber || '').replace(/\D/g, '');
     const whatsappLink = whatsappDigits.length >= 8
         ? `https://wa.me/${whatsappDigits}?text=${encodeURIComponent(`Order ${order.public_reference} inquiry`)}`
         : null;
+    const csrfToken = (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content || '';
+    const xentriOpen = Boolean(xentriPay)
+        && ['awaiting_payment', 'payment_review'].includes(order.order_status)
+        && ['pending', 'failed', 'expired'].includes(xentriPay.status);
 
     return (
         <div className="min-h-screen bg-[var(--ivory)]">
@@ -22,6 +26,34 @@ export default function OrderShow({ order, momoPayCode, whatsappNumber, flash, e
                     <p>Payment status: <StatusBadge status={order.payment_status} label={order.payment_status === 'paid' ? 'Paid — verified' : undefined} /></p>
                     <p>Delivery status: <StatusBadge status={order.delivery_status} /></p>
                 </div>
+                {xentriOpen && (
+                    <section className="mb-5 border border-[var(--beige)] bg-[var(--sand)] p-5">
+                        <h2 className="font-semibold text-[var(--chocolate)]">Mobile Money payment — XentriPay</h2>
+                        {xentriPay.sandbox && (
+                            <p className="mt-2 text-xs font-semibold uppercase tracking-wider text-[var(--chocolate)]">Sandbox — no real money will be charged</p>
+                        )}
+                        {xentriPay.status === 'failed' ? (
+                            <>
+                                <p className="mt-2">The last mobile money request was not completed. You can try again.</p>
+                                <form action={`/order/${order.public_reference}/xentripay/retry`} method="post" className="mt-4">
+                                    <input type="hidden" name="_token" value={csrfToken} />
+                                    <button className="store-primary-button" disabled={!xentriPayEnabled}>Retry mobile money payment</button>
+                                </form>
+                            </>
+                        ) : (
+                            <>
+                                <p className="mt-2">Approve the payment prompt sent to <strong>{order.customer_phone}</strong> for <strong>RWF {new Intl.NumberFormat('en').format(order.total_rwf)}</strong>.</p>
+                                <p className="mt-2 text-sm">Your order is confirmed only after XentriPay reports the payment as successful.</p>
+                                {xentriPay.reference && (
+                                    <form action={`/order/${order.public_reference}/xentripay/check`} method="post" className="mt-4">
+                                        <input type="hidden" name="_token" value={csrfToken} />
+                                        <button className="store-primary-button" disabled={!xentriPayEnabled}>Check payment status</button>
+                                    </form>
+                                )}
+                            </>
+                        )}
+                    </section>
+                )}
                 {['pending', 'under_review'].includes(order.payment_status) && momoPayCode && (
                     <section className="mb-5 border border-[var(--beige)] bg-[var(--sand)] p-5">
                         <h2 className="font-semibold text-[var(--chocolate)]">Manual MoMo payment — not automatically verified</h2>
@@ -31,7 +63,7 @@ export default function OrderShow({ order, momoPayCode, whatsappNumber, flash, e
                         <p className="mt-2 text-sm">Your order stays unpaid until an administrator manually verifies proof of payment.</p>
                         {order.payment_status !== 'under_review' && (
                             <form action={`/order/${order.public_reference}/proof`} method="post" encType="multipart/form-data" className="mt-4 space-y-3">
-                                <input type="hidden" name="_token" value={(document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content || ''} />
+                                <input type="hidden" name="_token" value={csrfToken} />
                                 <label className="block">Upload payment proof (JPEG, PNG or WebP, max 5 MB)
                                     <input type="file" name="proof" accept="image/jpeg,image/png,image/webp" required className="mt-2 block" />
                                 </label>

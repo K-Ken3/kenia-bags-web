@@ -17,6 +17,8 @@ use App\Http\Controllers\PolicyController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ShopController;
 use App\Http\Controllers\WebhookController;
+use App\Http\Controllers\XentriPayController;
+use App\Http\Controllers\XentriPayWebhookController;
 use App\Models\Category;
 use App\Models\PolicyPage;
 use App\Models\ProductVariant;
@@ -112,12 +114,15 @@ Route::get('/order/{order:public_reference}', [OrderLookupController::class, 'sh
 // Payments
 Route::get('/order/{order:public_reference}/proof', [PaymentController::class, 'show'])->name('payment.show');
 Route::post('/order/{order:public_reference}/proof', [PaymentController::class, 'uploadProof'])->middleware('throttle:5,1')->name('payment.proof');
+Route::post('/order/{order:public_reference}/xentripay/check', [XentriPayController::class, 'check'])->middleware('throttle:10,1')->name('xentripay.check');
+Route::post('/order/{order:public_reference}/xentripay/retry', [XentriPayController::class, 'retry'])->middleware('throttle:5,1')->name('xentripay.retry');
 
 // Policies
 Route::get('/policies/{slug}', [PolicyController::class, 'show'])->name('policies.show');
 
 // Webhook
 Route::post('/webhooks/payment', [WebhookController::class, 'handle'])->middleware('throttle:10,1')->name('webhooks.payment');
+Route::post('/webhooks/xentripay', [XentriPayWebhookController::class, 'handle'])->middleware('throttle:30,1')->name('webhooks.xentripay');
 
 // Admin routes
 Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(function () {
