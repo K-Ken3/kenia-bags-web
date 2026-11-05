@@ -63,6 +63,7 @@ class XentriPayTest extends StoreTestCase
                 && $data['amount'] === 42000
                 && $data['currency'] === 'RWF'
                 && $data['pmethod'] === 'momo'
+                && $data['chargesIncluded'] === true
                 && $data['cnumber'] === '0780123456'
                 && $data['msisdn'] === '250780123456'
                 && $data['customerRef'] === $order->public_reference.'-'.$payment->id;

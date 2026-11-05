@@ -46,7 +46,7 @@ class XentriPayProvider implements PaymentProvider
             'currency' => 'RWF',
             'pmethod' => 'momo',
             'customerRef' => $customerRef,
-            'chargesIncluded' => true,
+            'chargesIncluded' => (bool) config('payments.xentripay.charges_included', true),
         ]);
 
         $payment->update([
