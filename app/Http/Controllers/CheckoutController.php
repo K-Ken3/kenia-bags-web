@@ -111,7 +111,9 @@ class CheckoutController extends Controller
                     return redirect()->away($result['checkout_url']);
                 }
 
-                $message = 'Your order has been received. Approve the '.XentriPayProvider::label($method).' prompt on your phone.';
+                $message = app(XentriPayClient::class)->sandbox()
+                    ? 'Your order has been received. XentriPay sandbox mode does not send a real phone prompt.'
+                    : 'Your order has been received. Approve the '.XentriPayProvider::label($method).' prompt on your phone.';
             }
         }
 

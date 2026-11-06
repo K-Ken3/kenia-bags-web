@@ -31,7 +31,7 @@ export default function OrderShow({ order, momoPayCode, xentriPay, xentriPayEnab
                     <section className="mb-5 border border-[var(--beige)] bg-[var(--sand)] p-5">
                         <h2 className="font-semibold text-[var(--chocolate)]">{xentriPay.label || 'Online payment'} — XentriPay</h2>
                         {xentriPay.sandbox && (
-                            <p className="mt-2 text-xs font-semibold uppercase tracking-wider text-[var(--chocolate)]">Sandbox — no real money will be charged</p>
+                            <p className="mt-2 text-xs font-semibold uppercase tracking-wider text-[var(--chocolate)]">Sandbox — no real money is charged and no real phone prompt is sent</p>
                         )}
                         {xentriPay.status === 'failed' ? (
                             <>

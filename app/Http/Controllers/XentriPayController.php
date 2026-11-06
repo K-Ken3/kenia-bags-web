@@ -38,9 +38,11 @@ class XentriPayController extends Controller
         return back()->with('success', match ($result['status']) {
             'paid' => 'Payment confirmed. Thank you!',
             'failed' => 'The '.$label.' payment failed. You can retry the payment.',
-            default => $payment->provider === 'xentripay_card'
-                ? 'Payment is still pending. Complete the card payment page, then check again.'
-                : 'Payment is still pending. Approve the prompt on your phone and check again.',
+            default => app(XentriPayClient::class)->sandbox()
+                ? 'Payment is still pending. Sandbox payments are completed from the XentriPay dashboard.'
+                : ($payment->provider === 'xentripay_card'
+                    ? 'Payment is still pending. Complete the card payment page, then check again.'
+                    : 'Payment is still pending. Approve the prompt on your phone and check again.'),
         });
     }
 
@@ -118,7 +120,11 @@ class XentriPayController extends Controller
             return redirect()->away($result['checkout_url']);
         }
 
-        return back()->with('success', 'A new '.XentriPayProvider::label($method).' request was sent to your phone.');
+        $message = app(XentriPayClient::class)->sandbox()
+            ? 'A new sandbox payment request was created. No real phone prompt is sent.'
+            : 'A new '.XentriPayProvider::label($method).' request was sent to your phone.';
+
+        return back()->with('success', $message);
     }
 
     private function latestPayment(Order $order): ?Payment
