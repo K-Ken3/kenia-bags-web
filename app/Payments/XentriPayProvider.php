@@ -7,6 +7,7 @@ use App\Contracts\PaymentProvider;
 use App\Exceptions\PaymentProviderException;
 use App\Models\Payment;
 use App\Models\PaymentEvent;
+use App\Support\Monitoring;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -149,23 +150,44 @@ class XentriPayProvider implements PaymentProvider
                 'customer_ref' => $customerRef,
                 'provider_ref' => $providerRef,
             ]);
+            app(Monitoring::class)->record('webhook_failure', 'warning', 'XentriPay webhook referenced an unknown payment.', [
+                'provider' => 'xentripay',
+                'reason' => 'unknown_reference',
+            ]);
 
             return ['processed' => false, 'reason' => 'unknown_reference'];
         }
 
         $amount = data_get($payload, 'data.amount');
-        if ($amount !== null && (int) $amount !== (int) $payment->amount_rwf) {
-            throw ValidationException::withMessages(['amount' => 'The webhook amount does not match the payment.']);
-        }
         $currency = data_get($payload, 'data.currency');
-        if ($currency !== null && strtoupper((string) $currency) !== 'RWF') {
-            throw ValidationException::withMessages(['currency' => 'The webhook currency does not match the payment.']);
-        }
-
         $status = self::mapStatus(
             (string) (data_get($payload, 'data.status') ?? ''),
             (string) ($request->header('X-Xentripay-Event') ?: data_get($payload, 'event', '')),
         );
+
+        if ($status === 'paid') {
+            if ($amount === null || (int) $amount !== (int) $payment->amount_rwf) {
+                app(Monitoring::class)->record('payment_reconciliation_failure', 'critical', 'XentriPay webhook amount did not match the payment.', [
+                    'provider' => 'xentripay',
+                    'payment_id' => $payment->id,
+                    'order_id' => $payment->order_id,
+                    'reason' => 'amount',
+                ]);
+
+                throw ValidationException::withMessages(['amount' => 'The webhook amount does not match the payment.']);
+            }
+            if ($currency === null || strtoupper((string) $currency) !== 'RWF') {
+                app(Monitoring::class)->record('payment_reconciliation_failure', 'critical', 'XentriPay webhook currency did not match the payment.', [
+                    'provider' => 'xentripay',
+                    'payment_id' => $payment->id,
+                    'order_id' => $payment->order_id,
+                    'reason' => 'currency',
+                ]);
+
+                throw ValidationException::withMessages(['currency' => 'The webhook currency does not match the payment.']);
+            }
+        }
+
         $eventId = $request->header('X-Xentripay-Idempotency-Key')
             ?: data_get($payload, 'idempotencyKey')
             ?: 'xentripay:'.hash('sha256', $request->getContent());
@@ -215,11 +237,30 @@ class XentriPayProvider implements PaymentProvider
             ?? data_get($data, 'data.redirect_url');
 
         $scheme = is_string($url) ? strtolower((string) parse_url($url, PHP_URL_SCHEME)) : '';
-        if (! is_string($url) || ! filter_var($url, FILTER_VALIDATE_URL) || ! in_array($scheme, ['http', 'https'], true)) {
+        $host = is_string($url) ? (string) parse_url($url, PHP_URL_HOST) : '';
+        $allowedSchemes = app()->environment('production') ? ['https'] : ['http', 'https'];
+
+        if (! is_string($url)
+            || ! filter_var($url, FILTER_VALIDATE_URL)
+            || ! in_array($scheme, $allowedSchemes, true)
+            || ! self::isPublicHost($host)) {
             throw new PaymentProviderException('XentriPay did not return a card payment page.');
         }
 
         return $url;
+    }
+
+    private static function isPublicHost(string $host): bool
+    {
+        if ($host === '' || in_array(strtolower($host), ['localhost', '127.0.0.1', '::1'], true)) {
+            return false;
+        }
+
+        if (filter_var($host, FILTER_VALIDATE_IP)) {
+            return filter_var($host, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) !== false;
+        }
+
+        return true;
     }
 
     public static function mapStatus(string $status, string $event = ''): string

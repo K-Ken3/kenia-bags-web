@@ -9,6 +9,8 @@ class PaymentProof extends Model
 {
     protected $fillable = ['payment_id', 'order_id', 'path', 'reference', 'status', 'uploaded_at', 'reviewed_by', 'review_note'];
 
+    protected $hidden = ['path', 'reviewed_by'];
+
     protected function casts(): array
     {
         return ['uploaded_at' => 'datetime'];

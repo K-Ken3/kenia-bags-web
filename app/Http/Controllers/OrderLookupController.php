@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Order;
+use App\Models\Setting;
 use App\Payments\XentriPayProvider;
 use Illuminate\Http\Request;
 
@@ -49,7 +50,7 @@ class OrderLookupController extends Controller
         return store_page('Order/Show', [
             'order' => $order,
             'momoPayCode' => $order->payments->first()?->provider === 'manual_momo'
-                ? \App\Models\Setting::get('momo_pay_code')
+                ? Setting::get('momo_pay_code')
                 : null,
             'xentriPayEnabled' => (bool) config('payments.xentripay.enabled') && filled(config('payments.xentripay.api_key')),
             'xentriPay' => $xentriPayment ? [
@@ -61,7 +62,7 @@ class OrderLookupController extends Controller
                 'raw_status' => $xentriPayment->raw_status,
                 'sandbox' => str_contains((string) config('payments.xentripay.base_url'), 'test.'),
             ] : null,
-            'whatsappNumber' => \App\Models\Setting::get('whatsapp_number'),
+            'whatsappNumber' => Setting::get('whatsapp_number'),
         ]);
     }
 }

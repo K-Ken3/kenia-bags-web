@@ -114,4 +114,19 @@ return [
 
     'password_timeout' => env('AUTH_PASSWORD_TIMEOUT', 10800),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Administrator Session Limits
+    |--------------------------------------------------------------------------
+    |
+    | Admin sessions expire after this many minutes of inactivity and after the
+    | absolute lifetime below, regardless of activity. Both are enforced
+    | server-side by the admin middleware.
+    |
+    */
+
+    'admin_idle_timeout' => (int) env('ADMIN_IDLE_TIMEOUT', 60),
+
+    'admin_session_lifetime' => (int) env('ADMIN_SESSION_LIFETIME', 480),
+
 ];

@@ -9,6 +9,8 @@ use App\Models\Payment;
 use App\Payments\XentriPayClient;
 use App\Payments\XentriPayProvider;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class XentriPayController extends Controller
 {
@@ -30,7 +32,7 @@ class XentriPayController extends Controller
         try {
             $result = app(XentriPayProvider::class)->verify($payment);
         } catch (PaymentProviderException $exception) {
-            return back()->with('error', $exception->getMessage());
+            return back()->with('error', $this->providerMessage($exception));
         }
 
         $label = XentriPayProvider::label(XentriPayProvider::methodFor($payment));
@@ -65,7 +67,7 @@ class XentriPayController extends Controller
             $result = app(XentriPayProvider::class)->verify($payment);
         } catch (PaymentProviderException $exception) {
             return redirect()->route('order.show', $order)
-                ->with('error', 'We could not confirm the card payment yet: '.$exception->getMessage());
+                ->with('error', 'We could not confirm the card payment yet: '.$this->providerMessage($exception));
         }
 
         return redirect()->route('order.show', $order)->with(
@@ -85,36 +87,49 @@ class XentriPayController extends Controller
         if (! app(XentriPayClient::class)->enabled()) {
             return back()->with('error', 'Online payment is not currently available.');
         }
-        if ($order->payment_status === 'paid' || $order->order_status !== 'awaiting_payment') {
-            return back()->with('error', 'This order can no longer be paid online.');
-        }
-        if ($order->expires_at?->isPast()) {
-            return back()->with('error', 'This order has expired. Please place a new order.');
-        }
 
-        $latest = $this->latestPayment($order);
-        if ($latest && ! in_array($latest->status, ['failed', 'expired'], true)) {
-            return back()->with('error', 'A payment request is still awaiting confirmation. Check its status first.');
-        }
+        try {
+            $payment = DB::transaction(function () use ($order) {
+                $order = Order::lockForUpdate()->findOrFail($order->id);
 
-        $method = $latest ? XentriPayProvider::methodFor($latest) : 'xentripay_momo';
-        $payment = Payment::create([
-            'order_id' => $order->id,
-            'method' => $method,
-            'provider' => $method,
-            'amount' => $order->total_rwf,
-            'amount_rwf' => $order->total_rwf,
-            'currency' => 'RWF',
-            'status' => 'pending',
-            'raw_status' => 'pending',
-        ]);
-        $order->update(['payment_status' => 'pending']);
+                if ($order->payment_status === 'paid' || $order->order_status !== 'awaiting_payment') {
+                    throw ValidationException::withMessages(['payment' => 'This order can no longer be paid online.']);
+                }
+                if ($order->expires_at?->isPast()) {
+                    throw ValidationException::withMessages(['payment' => 'This order has expired. Please place a new order.']);
+                }
+
+                $latest = $order->payments()->whereIn('provider', XentriPayProvider::METHODS)->latest('id')->first();
+                if ($latest && ! in_array($latest->status, ['failed', 'expired'], true)) {
+                    throw ValidationException::withMessages(['payment' => 'A payment request is still awaiting confirmation. Check its status first.']);
+                }
+
+                $method = $latest ? XentriPayProvider::methodFor($latest) : 'xentripay_momo';
+                $payment = Payment::create([
+                    'order_id' => $order->id,
+                    'method' => $method,
+                    'provider' => $method,
+                    'amount' => $order->total_rwf,
+                    'amount_rwf' => $order->total_rwf,
+                    'currency' => 'RWF',
+                    'status' => 'pending',
+                    'raw_status' => 'pending',
+                ]);
+                $order->update(['payment_status' => 'pending']);
+
+                return $payment;
+            });
+        } catch (ValidationException $exception) {
+            return back()->with('error', collect($exception->errors())->flatten()->first());
+        }
 
         try {
             $result = $initiate->handle($order, $payment);
         } catch (PaymentProviderException $exception) {
             return back()->with('error', $exception->getMessage());
         }
+
+        $method = XentriPayProvider::methodFor($payment);
 
         if ($result['checkout_url'] ?? null) {
             return redirect()->away($result['checkout_url']);
@@ -130,5 +145,14 @@ class XentriPayController extends Controller
     private function latestPayment(Order $order): ?Payment
     {
         return $order->payments()->whereIn('provider', XentriPayProvider::METHODS)->latest('id')->first();
+    }
+
+    private function providerMessage(PaymentProviderException $exception): string
+    {
+        if (app()->environment(['local', 'testing'])) {
+            return $exception->getMessage();
+        }
+
+        return 'The payment provider is temporarily unavailable. Please try again shortly.';
     }
 }

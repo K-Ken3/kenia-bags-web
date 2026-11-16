@@ -2,8 +2,8 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Order extends Model
 {
@@ -12,6 +12,14 @@ class Order extends Model
         'shipping_address', 'notes', 'subtotal', 'shipping_fee', 'total', 'status', 'payment_status',
         'public_reference', 'idempotency_key', 'delivery_location', 'subtotal_rwf',
         'delivery_fee_rwf', 'total_rwf', 'order_status', 'delivery_status', 'expires_at',
+    ];
+
+    /**
+     * Internal reconciliation columns are not needed by the storefront.
+     */
+    protected $hidden = [
+        'user_id', 'order_number', 'idempotency_key', 'shipping_address',
+        'subtotal', 'shipping_fee', 'total', 'status',
     ];
 
     protected function casts(): array

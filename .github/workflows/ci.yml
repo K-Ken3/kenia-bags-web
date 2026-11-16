@@ -1,0 +1,138 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tests:
+    name: Tests and dependency audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: mbstring, fileinfo, gd, pdo_sqlite, sqlite3, zip, intl, bcmath
+          coverage: none
+          tools: composer:v2
+
+      - name: Cache Composer packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/composer
+          key: composer-${{ hashFiles('composer.lock') }}
+          restore-keys: composer-
+
+      - name: Install PHP dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Prepare environment
+        run: |
+          cp .env.example .env
+          php artisan key:generate --force
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install JS dependencies
+        run: npm ci
+
+      - name: Type-check frontend
+        run: npm run typecheck
+
+      - name: Build assets
+        run: npm run build
+
+      - name: Run tests
+        run: php artisan test
+
+      - name: Composer security audit
+        run: composer audit --locked --no-interaction
+
+      - name: npm security audit
+        run: npm audit --audit-level=high
+
+  style:
+    name: Code style (advisory)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    continue-on-error: true
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          coverage: none
+          tools: composer:v2
+
+      - name: Install PHP dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Check formatting of security-critical files
+        run: >
+          vendor/bin/pint --test
+          app/Actions/CreateStoreOrder.php
+          app/Actions/SettleXentriPayPayment.php
+          app/Console/Commands/MonitorOperations.php
+          app/Console/Commands/OperationalHealth.php
+          app/Console/Commands/PreflightProduction.php
+          app/Console/Commands/PruneOperationalEvents.php
+          app/Console/Commands/ResetAdminMfa.php
+          app/Console/Commands/ResetAdminPassword.php
+          app/Http/Controllers/Admin/CategoryController.php
+          app/Http/Controllers/Admin/ProductController.php
+          app/Http/Controllers/Admin/ProofController.php
+          app/Http/Controllers/AdminLoginController.php
+          app/Http/Controllers/AdminMfaController.php
+          app/Http/Controllers/ClientErrorController.php
+          app/Http/Controllers/HealthController.php
+          app/Http/Controllers/WebhookController.php
+          app/Http/Controllers/XentriPayController.php
+          app/Http/Middleware/EnsureAdmin.php
+          app/Http/Middleware/EnforceTrustedHosts.php
+          app/Http/Middleware/NormalizeProxyHeaders.php
+          app/Http/Middleware/SecurityHeaders.php
+          app/Models/OperationalEvent.php
+          app/Models/Order.php
+          app/Models/Payment.php
+          app/Models/PaymentProof.php
+          app/Payments/XentriPayProvider.php
+          app/Providers/AppServiceProvider.php
+          app/Services/AdminMfaService.php
+          app/Support/Monitoring.php
+          config/auth.php
+          config/cors.php
+          config/monitoring.php
+          config/payments.php
+          config/session.php
+          database/migrations/2026_11_12_000000_add_security_and_performance_indexes.php
+          database/migrations/2026_11_12_010000_add_two_factor_columns_to_users_table.php
+          database/migrations/2026_11_12_020000_create_operational_events_table.php
+          tests/Feature/AdminMfaTest.php
+          tests/Feature/MonitoringTest.php
+          tests/Feature/PreflightTest.php
+          tests/Feature/SecurityHardeningTest.php
+          tests/Feature/ProxyTrustTest.php
+          tests/Feature/XentriPayTest.php

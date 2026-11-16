@@ -2,16 +2,15 @@
 
 namespace App\Payments;
 
+use App\Actions\OrderInventory;
 use App\Contracts\PaymentProvider;
 use App\Models\Payment;
 use App\Models\PaymentEvent;
-use App\Actions\OrderInventory;
-use App\Models\Order;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
-use Illuminate\Database\UniqueConstraintViolationException;
 
 class SandboxProvider implements PaymentProvider
 {
@@ -43,41 +42,41 @@ class SandboxProvider implements PaymentProvider
 
         try {
             return DB::transaction(function () use ($data) {
-            $event = PaymentEvent::firstOrCreate(
-                ['event_id' => $data['event_id']],
-                ['provider' => 'sandbox', 'payment_id' => $data['payment_id'], 'event_type' => 'sandbox.webhook', 'payload' => $data],
-            );
-            if ($event->wasRecentlyCreated) {
-                $payment = Payment::with('order.items')->lockForUpdate()->findOrFail($data['payment_id']);
-                if ($payment->provider !== 'sandbox'
-                    || $payment->currency !== 'RWF'
-                    || $payment->amount_rwf !== $data['amount_rwf']
-                    || $payment->order->total_rwf !== $data['amount_rwf']
-                    || ! in_array($payment->order->order_status, ['awaiting_payment', 'payment_review'], true)
-                    || ! in_array($payment->order->payment_status, ['pending', 'under_review'], true)) {
-                    throw ValidationException::withMessages(['payment' => 'The sandbox event does not match this payment.']);
+                $event = PaymentEvent::firstOrCreate(
+                    ['event_id' => $data['event_id']],
+                    ['provider' => 'sandbox', 'payment_id' => $data['payment_id'], 'event_type' => 'sandbox.webhook', 'payload' => $data],
+                );
+                if ($event->wasRecentlyCreated) {
+                    $payment = Payment::with('order.items')->lockForUpdate()->findOrFail($data['payment_id']);
+                    if ($payment->provider !== 'sandbox'
+                        || $payment->currency !== 'RWF'
+                        || $payment->amount_rwf !== $data['amount_rwf']
+                        || $payment->order->total_rwf !== $data['amount_rwf']
+                        || ! in_array($payment->order->order_status, ['awaiting_payment', 'payment_review'], true)
+                        || ! in_array($payment->order->payment_status, ['pending', 'under_review'], true)) {
+                        throw ValidationException::withMessages(['payment' => 'The sandbox event does not match this payment.']);
+                    }
+                    $payment->update(['status' => $data['status'], 'raw_status' => $data['status']]);
+                    if ($data['status'] === 'paid') {
+                        app(OrderInventory::class)->consume($payment->order);
+                        $payment->update(['verified_at' => now()]);
+                        $payment->order->update([
+                            'payment_status' => 'paid',
+                            'order_status' => 'confirmed',
+                            'status' => 'confirmed',
+                        ]);
+                    } elseif ($data['status'] === 'expired') {
+                        app(OrderInventory::class)->release($payment->order);
+                        $payment->order->update([
+                            'payment_status' => 'expired',
+                            'order_status' => 'cancelled',
+                            'status' => 'cancelled',
+                        ]);
+                    } elseif ($data['status'] === 'failed') {
+                        $payment->order->update(['payment_status' => 'failed']);
+                    }
+                    $event->update(['processed_at' => now()]);
                 }
-                $payment->update(['status' => $data['status'], 'raw_status' => $data['status']]);
-                if ($data['status'] === 'paid') {
-                    app(OrderInventory::class)->consume($payment->order);
-                    $payment->update(['verified_at' => now()]);
-                    $payment->order->update([
-                        'payment_status' => 'paid',
-                        'order_status' => 'confirmed',
-                        'status' => 'confirmed',
-                    ]);
-                } elseif ($data['status'] === 'expired') {
-                    app(OrderInventory::class)->release($payment->order);
-                    $payment->order->update([
-                        'payment_status' => 'expired',
-                        'order_status' => 'cancelled',
-                        'status' => 'cancelled',
-                    ]);
-                } elseif ($data['status'] === 'failed') {
-                    $payment->order->update(['payment_status' => 'failed']);
-                }
-                $event->update(['processed_at' => now()]);
-            }
 
                 return ['processed' => $event->wasRecentlyCreated, 'event_id' => $event->event_id];
             });

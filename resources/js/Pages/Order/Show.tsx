@@ -19,16 +19,16 @@ export default function OrderShow({ order, momoPayCode, xentriPay, xentriPayEnab
         <div className="min-h-screen bg-[var(--ivory)]">
             <StoreHeader brandName={brandName} cartCount={cartCount} />
             <StatusMessages flash={flash} errors={errors} />
-            <main className="mx-auto max-w-3xl px-4 py-8 sm:px-6 lg:px-8">
+            <main className="store-page mx-auto max-w-3xl px-4 py-8 sm:px-6 lg:px-8">
                 <p className="store-kicker">Order confirmation</p>
                 <h1 className="mt-2 font-serif text-3xl text-[var(--chocolate)]">{order.public_reference}</h1>
-                <div className="my-5 space-y-2 border border-[var(--hairline)] bg-white p-5">
+                <div className="my-5 space-y-2 rounded-[20px] border border-[var(--hairline)] bg-[var(--surface)] p-5 shadow-[var(--shadow-soft)]">
                     <p>Order status: <StatusBadge status={order.order_status} /></p>
                     <p>Payment status: <StatusBadge status={order.payment_status} label={order.payment_status === 'paid' ? 'Paid — verified' : undefined} /></p>
                     <p>Delivery status: <StatusBadge status={order.delivery_status} /></p>
                 </div>
                 {xentriOpen && (
-                    <section className="mb-5 border border-[var(--beige)] bg-[var(--sand)] p-5">
+                    <section className="mb-5 rounded-[20px] border border-[var(--beige)] bg-[var(--sand)] p-5">
                         <h2 className="font-semibold text-[var(--chocolate)]">{xentriPay.label || 'Online payment'} — XentriPay</h2>
                         {xentriPay.sandbox && (
                             <p className="mt-2 text-xs font-semibold uppercase tracking-wider text-[var(--chocolate)]">Sandbox — no real money is charged and no real phone prompt is sent</p>
@@ -63,7 +63,7 @@ export default function OrderShow({ order, momoPayCode, xentriPay, xentriPayEnab
                     </section>
                 )}
                 {['pending', 'under_review'].includes(order.payment_status) && momoPayCode && (
-                    <section className="mb-5 border border-[var(--beige)] bg-[var(--sand)] p-5">
+                    <section className="mb-5 rounded-[20px] border border-[var(--beige)] bg-[var(--sand)] p-5">
                         <h2 className="font-semibold text-[var(--chocolate)]">Manual MoMo payment — not automatically verified</h2>
                         <p className="mt-2">Pay code: <strong>{momoPayCode}</strong></p>
                         <p>Amount: <strong>RWF {order.total_rwf}</strong></p>
@@ -83,15 +83,15 @@ export default function OrderShow({ order, momoPayCode, xentriPay, xentriPayEnab
                         )}
                     </section>
                 )}
-                {whatsappLink && <a href={whatsappLink} target="_blank" rel="noreferrer" className="mb-5 inline-block underline">Contact store about this order</a>}
-                <section className="mb-5 border border-[var(--hairline)] bg-white p-4">
+                {whatsappLink && <a href={whatsappLink} target="_blank" rel="noreferrer" className="mb-5 inline-flex min-h-11 items-center rounded-full border border-[var(--hairline)] bg-[var(--paper)] px-5 underline-offset-4 hover:border-[var(--beige)] hover:underline">Contact store about this order</a>}
+                <section className="mb-5 rounded-[20px] border border-[var(--hairline)] bg-[var(--surface)] p-5">
                     <h2 className="font-semibold">Delivery details</h2>
                     <p className="mt-2">{order.customer_name}</p>
                     <p>{order.customer_phone}</p>
                     {order.customer_email && <p>{order.customer_email}</p>}
                     <p className="mt-2">{order.delivery_location}</p>
                 </section>
-                <section className="border border-[var(--hairline)] bg-white p-4">
+                <section className="rounded-[20px] border border-[var(--hairline)] bg-[var(--surface)] p-5">
                     <h2 className="mb-2 font-semibold">Order items</h2>
                     {order.items.map((item: any) => (
                         <div key={item.id} className="flex justify-between gap-4 border-b border-[var(--hairline)] py-3 last:border-0">

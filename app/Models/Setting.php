@@ -2,8 +2,8 @@
 
 namespace App\Models;
 
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Cache;
 
 class Setting extends Model
 {
@@ -27,6 +27,7 @@ class Setting extends Model
     public static function integer(string $key, int $default = 0): int
     {
         $value = static::get($key);
+
         return is_numeric($value) ? (int) $value : $default;
     }
 }

@@ -4,10 +4,9 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\ProductUpsertRequest;
+use App\Models\AuditLog;
 use App\Models\Category;
 use App\Models\Product;
-use App\Models\ProductImage;
-use App\Models\ProductVariant;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -45,8 +44,11 @@ class ProductController extends Controller
             ]);
             $this->syncVariants($product, $data['variants']);
             $this->saveImage($request, $product, $data['image_alt'] ?? null);
+
             return $product;
         });
+
+        $this->audit('product.created', $product, $data);
 
         return redirect()->route('admin.products.edit', $product)->with('success', 'Product created.');
     }
@@ -84,6 +86,8 @@ class ProductController extends Controller
             $this->saveImage($request, $product, $data['image_alt'] ?? null);
         });
 
+        $this->audit('product.updated', $product, $data);
+
         return back()->with('success', 'Product updated.');
     }
 
@@ -93,8 +97,26 @@ class ProductController extends Controller
             return back()->withErrors(['product' => 'Products with order history must be archived, not deleted.']);
         }
         $product->update(['status' => 'archived', 'is_active' => false]);
+        $this->audit('product.archived', $product, ['status' => 'archived']);
 
         return redirect()->route('admin.products.index')->with('success', 'Product archived.');
+    }
+
+    private function audit(string $action, Product $product, array $data): void
+    {
+        AuditLog::create([
+            'user_id' => auth()->id(),
+            'action' => $action,
+            'subject_type' => Product::class,
+            'subject_id' => $product->id,
+            'metadata' => [
+                'slug' => $product->slug,
+                'status' => $product->status,
+                'price_rwf' => $product->price_rwf,
+                'stock_quantity' => $product->stock_quantity,
+                'variant_count' => count($data['variants'] ?? []),
+            ],
+        ]);
     }
 
     private function syncVariants(Product $product, array $variants): void

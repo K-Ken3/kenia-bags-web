@@ -3,6 +3,7 @@ import StoreFooter from '../../Components/StoreFooter';
 import StoreHeader from '../../Components/StoreHeader';
 import StatusMessages from '../../Components/StatusMessages';
 import StoreProductCard from '../../Components/StoreProductCard';
+import Reveal from '../../Components/Reveal';
 
 export default function ShopIndex({ products, categories = [], filters = {}, brandName, cartCount, contactEmail, contactPhone, flash, errors }: any) {
     return (
@@ -10,11 +11,11 @@ export default function ShopIndex({ products, categories = [], filters = {}, bra
             <StoreHeader brandName={brandName} cartCount={cartCount} />
             <StatusMessages flash={flash} errors={errors} />
 
-            <main className="mx-auto max-w-[90rem] px-4 py-8 sm:px-6 sm:py-12 lg:px-10">
+            <main className="store-page mx-auto max-w-[90rem] px-4 py-8 sm:px-6 sm:py-12 lg:px-10">
                 <header className="mb-8 border-b border-[var(--hairline)] pb-7">
                     <p className="store-kicker">Browse all styles</p>
                     <div className="mt-3 flex flex-wrap items-end justify-between gap-4">
-                        <h1 className="store-section-title text-[var(--chocolate)]">The collection</h1>
+                        <h1 className="store-section-title text-[var(--chocolate)]">The <em className="store-accent-word">collection</em></h1>
                         <p className="text-sm text-[var(--muted)]">{products?.total ?? products?.data?.length ?? 0} pieces</p>
                     </div>
                 </header>
@@ -22,16 +23,16 @@ export default function ShopIndex({ products, categories = [], filters = {}, bra
                     <aside className="border-b border-[var(--hairline)] pb-5 lg:border-b-0 lg:pb-0">
                         <h2 className="store-kicker mb-4">Categories</h2>
                         <div className="flex flex-wrap gap-2 lg:flex-col lg:items-start lg:gap-1">
-                            <a href="/shop" aria-current={!filters.category ? 'page' : undefined} className={`min-h-10 content-center px-3 text-sm text-[var(--chocolate)] hover:bg-[var(--chocolate-wash)] lg:px-0 lg:hover:bg-transparent ${!filters.category ? 'font-semibold underline underline-offset-4' : ''}`}>All bags</a>
+                            <a href="/shop" aria-current={!filters.category ? 'page' : undefined} className={`min-h-10 content-center rounded-full px-4 text-sm text-[var(--chocolate)] hover:bg-[var(--primary-tint)] lg:px-3 ${!filters.category ? 'bg-[var(--primary-tint)] font-semibold text-[var(--primary-hover)]' : ''}`}>All bags</a>
                             {categories?.map((cat: any) => (
-                                <a key={cat.id} href={`/shop?category=${cat.slug}`} aria-current={filters.category === cat.slug ? 'page' : undefined} className={`min-h-10 content-center px-3 text-sm text-[var(--chocolate)] hover:bg-[var(--chocolate-wash)] lg:px-0 lg:hover:bg-transparent ${filters.category === cat.slug ? 'font-semibold underline underline-offset-4' : ''}`}>
+                                <a key={cat.id} href={`/shop?category=${cat.slug}`} aria-current={filters.category === cat.slug ? 'page' : undefined} className={`min-h-10 content-center rounded-full px-4 text-sm text-[var(--chocolate)] hover:bg-[var(--primary-tint)] lg:px-3 ${filters.category === cat.slug ? 'bg-[var(--primary-tint)] font-semibold text-[var(--primary-hover)]' : ''}`}>
                                     {cat.name}
                                 </a>
                             ))}
                         </div>
                     </aside>
                     <div className="min-w-0">
-                        <form action="/shop" method="get" className="mb-7 grid grid-cols-2 items-end gap-3 border border-[var(--hairline)] bg-white p-4 sm:grid-cols-3 xl:grid-cols-6">
+                        <form action="/shop" method="get" className="mb-7 grid grid-cols-2 items-end gap-3 rounded-[20px] border border-[var(--hairline)] bg-[var(--surface)] p-4 shadow-[var(--shadow-soft)] sm:grid-cols-3 xl:grid-cols-6">
                             {filters.category && <input type="hidden" name="category" value={filters.category} />}
                             <label className="col-span-2 min-w-0 text-xs font-semibold uppercase tracking-wider sm:col-span-3 xl:col-span-2">Search
                                 <input type="search" name="search" defaultValue={filters.search || ''} placeholder="Find a bag" className="store-input mt-1 text-sm font-normal normal-case tracking-normal" />
@@ -54,21 +55,23 @@ export default function ShopIndex({ products, categories = [], filters = {}, bra
                                 <input type="checkbox" name="in_stock" value="1" defaultChecked={filters.in_stock === '1' || filters.in_stock === true} />
                                 In stock only
                             </label>
-                            <button type="submit" className="min-h-11 bg-[var(--chocolate)] px-4 text-xs font-semibold uppercase tracking-wider text-white hover:bg-[var(--chocolate-soft)]">Apply</button>
+                            <button type="submit" className="min-h-11 rounded-full bg-[var(--primary)] px-5 text-xs font-semibold uppercase tracking-wider text-[var(--primary-ink)] hover:bg-[var(--primary-hover)]">Apply</button>
                             <a href={filters.category ? `/shop?category=${encodeURIComponent(filters.category)}` : '/shop'} className="col-span-2 min-h-11 content-center text-center text-xs font-semibold uppercase tracking-wider text-[var(--chocolate)] underline underline-offset-4 sm:col-span-3 xl:col-span-6 xl:text-right">Clear filters</a>
                         </form>
                         <div className="grid grid-cols-2 gap-x-4 gap-y-8 sm:gap-x-6 xl:grid-cols-3">
-                            {products?.data?.map((product: any) => (
-                                <StoreProductCard key={product.id} product={product} />
+                            {products?.data?.map((product: any, index: number) => (
+                                <Reveal key={product.id} delay={Math.min(index, 5) * 55} className="min-w-0">
+                                    <StoreProductCard product={product} />
+                                </Reveal>
                             ))}
                         </div>
                         {products?.data?.length === 0 && (
-                            <p className="border border-[var(--hairline)] bg-white p-8 text-center text-[var(--muted)]">No products match your search yet.</p>
+                            <p className="rounded-[20px] border border-[var(--hairline)] bg-[var(--surface)] p-8 text-center text-[var(--muted)]">No products match your search yet.</p>
                         )}
                         {products?.links?.length > 3 && (
                             <nav aria-label="Pagination" className="mt-10 flex flex-wrap justify-center gap-2 border-t border-[var(--hairline)] pt-6">
                                 {products.links.map((link: any, index: number) => (
-                                    <a key={index} href={link.url || '#'} aria-current={link.active ? 'page' : undefined} className={`grid min-h-10 min-w-10 place-items-center border border-[var(--hairline)] px-3 text-sm ${link.active ? 'border-[var(--chocolate)] bg-[var(--chocolate)] text-white' : 'bg-white'} ${!link.url ? 'pointer-events-none opacity-40' : ''}`}>
+                                    <a key={index} href={link.url || '#'} aria-current={link.active ? 'page' : undefined} className={`grid min-h-10 min-w-10 place-items-center rounded-full border border-[var(--hairline)] px-3 text-sm ${link.active ? 'border-[var(--chocolate)] bg-[var(--chocolate)] text-white' : 'bg-[var(--paper)]'} ${!link.url ? 'pointer-events-none opacity-40' : ''}`}>
                                         {link.label.replace(/<[^>]*>/g, '').replaceAll('&laquo;', '«').replaceAll('&raquo;', '»')}
                                     </a>
                                 ))}

@@ -10,11 +10,11 @@ export default function StatusMessages({ flash = {}, errors = {} }: Props) {
     if (!flash.success && !flash.error && messages.length === 0) return null;
 
     return (
-        <div className="mx-auto max-w-7xl space-y-2 px-4 pt-4 sm:px-6 lg:px-8" role={flash.error || messages.length > 0 ? 'alert' : 'status'} aria-live={flash.error || messages.length > 0 ? 'assertive' : 'polite'}>
-            {flash.success && <p className="rounded border border-green-200 bg-green-50 p-3 text-green-800">{flash.success}</p>}
-            {flash.error && <p className="rounded border border-red-200 bg-red-50 p-3 text-red-800">{flash.error}</p>}
+        <div className="store-status mx-auto max-w-7xl space-y-2 px-4 pt-4 sm:px-6 lg:px-8" role={flash.error || messages.length > 0 ? 'alert' : 'status'} aria-live={flash.error || messages.length > 0 ? 'assertive' : 'polite'}>
+            {flash.success && <p className="rounded-2xl border border-[#b9d6c3] bg-[#eaf4ed] p-3.5 text-[#1f5138]">{flash.success}</p>}
+            {flash.error && <p className="rounded-2xl border border-[#e3c4bc] bg-[#fbeeea] p-3.5 text-[#7d2f22]">{flash.error}</p>}
             {messages.map((message, index) => (
-                <p key={index} className="rounded border border-red-200 bg-red-50 p-3 text-red-800">{message}</p>
+                <p key={index} className="rounded-2xl border border-[#e3c4bc] bg-[#fbeeea] p-3.5 text-[#7d2f22]">{message}</p>
             ))}
         </div>
     );

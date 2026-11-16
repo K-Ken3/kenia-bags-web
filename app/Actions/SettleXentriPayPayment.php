@@ -7,6 +7,7 @@ use App\Models\Order;
 use App\Models\Payment;
 use App\Models\ProductVariant;
 use App\Payments\XentriPayProvider;
+use App\Support\Monitoring;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -30,7 +31,7 @@ class SettleXentriPayPayment
             }
 
             $rawStatus = 'xentripay.'.$status.' ('.$source.')';
-            $context = ['payment_id' => $payment->id, 'order_id' => $order->id, 'source' => $source, 'payload' => $payload];
+            $context = ['payment_id' => $payment->id, 'order_id' => $order->id, 'source' => $source, 'payload' => $this->redact($payload)];
 
             if ($status === 'paid') {
                 if ($order->payment_status === 'paid') {
@@ -45,6 +46,11 @@ class SettleXentriPayPayment
                     // instead of silently consuming inventory that may already be released.
                     $payment->update(['status' => 'paid', 'verified_at' => now(), 'raw_status' => 'xentripay.paid_after_close']);
                     Log::warning('XentriPay payment received for a closed order.', $context);
+                    app(Monitoring::class)->record('payment_reconciliation_failure', 'critical', 'XentriPay payment received for a closed order.', [
+                        'payment_id' => $payment->id,
+                        'order_id' => $order->id,
+                        'reason' => 'order_closed',
+                    ]);
 
                     return ['status' => 'paid', 'applied' => false, 'reason' => 'order_closed'];
                 }
@@ -55,6 +61,11 @@ class SettleXentriPayPayment
                     $payment->update(['status' => 'paid', 'verified_at' => now(), 'raw_status' => 'xentripay.paid_without_stock']);
                     $order->update(['payment_status' => 'paid', 'order_status' => 'payment_review', 'status' => 'payment_review']);
                     Log::warning('XentriPay payment received without reserved stock.', $context);
+                    app(Monitoring::class)->record('payment_reconciliation_failure', 'critical', 'XentriPay payment received without reserved stock.', [
+                        'payment_id' => $payment->id,
+                        'order_id' => $order->id,
+                        'reason' => 'stock_unavailable',
+                    ]);
 
                     return ['status' => 'paid', 'applied' => false, 'reason' => 'stock_unavailable'];
                 }
@@ -96,5 +107,24 @@ class SettleXentriPayPayment
         }
 
         return true;
+    }
+
+    /**
+     * Provider payloads can contain customer phone numbers and names. Keep logs free
+     * of personal data while retaining the fields useful for reconciliation.
+     */
+    private function redact(array $payload): array
+    {
+        $sensitive = ['msisdn', 'cnumber', 'phone', 'customer_phone', 'email', 'customer_email', 'cname', 'name', 'card', 'pan', 'cvv', 'expiry', 'exp'];
+
+        foreach ($payload as $key => $value) {
+            if (is_array($value)) {
+                $payload[$key] = $this->redact($value);
+            } elseif (in_array(strtolower((string) $key), $sensitive, true)) {
+                $payload[$key] = '[redacted]';
+            }
+        }
+
+        return $payload;
     }
 }

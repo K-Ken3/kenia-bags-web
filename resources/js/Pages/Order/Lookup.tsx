@@ -9,12 +9,12 @@ export default function OrderLookup({ flash, errors, brandName, cartCount, conta
             <StoreHeader brandName={brandName} cartCount={cartCount} />
 
             <StatusMessages flash={flash} errors={errors} />
-            <main className="mx-auto max-w-3xl px-4 py-8 sm:px-6 sm:py-12 lg:px-10">
+            <main className="store-page mx-auto max-w-3xl px-4 py-8 sm:px-6 sm:py-12 lg:px-10">
                 <header className="mb-8 border-b border-[var(--hairline)] pb-6">
                     <p className="store-kicker">Order updates</p>
-                    <h1 className="store-section-title mt-3 text-[var(--chocolate)]">Track your order</h1>
+                    <h1 className="store-section-title mt-3 text-[var(--chocolate)]">Track your <em className="store-accent-word">order</em></h1>
                 </header>
-                <form action="/order/lookup" method="post" className="max-w-xl space-y-5 border border-[var(--hairline)] bg-[var(--surface)] p-5 sm:p-7">
+                <form action="/order/lookup" method="post" className="max-w-xl space-y-5 rounded-[20px] border border-[var(--hairline)] bg-[var(--surface)] p-5 shadow-[var(--shadow-soft)] sm:p-7">
                     <input type="hidden" name="_token" value={(document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content || ''} />
                     <div>
                         <label htmlFor="public_reference" className="mb-2 block text-xs font-bold uppercase tracking-wider">Order reference</label>

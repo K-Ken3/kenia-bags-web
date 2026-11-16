@@ -8,8 +8,11 @@ use App\Http\Controllers\Admin\ProofController;
 use App\Http\Controllers\Admin\SandboxPaymentController;
 use App\Http\Controllers\Admin\SettingController;
 use App\Http\Controllers\AdminLoginController;
+use App\Http\Controllers\AdminMfaController;
 use App\Http\Controllers\CartController;
 use App\Http\Controllers\CheckoutController;
+use App\Http\Controllers\ClientErrorController;
+use App\Http\Controllers\HealthController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\OrderLookupController;
 use App\Http\Controllers\PaymentController;
@@ -37,6 +40,7 @@ if (! function_exists('store_page')) {
             ->whereHas('product', fn ($query) => $query->where('status', 'active'))
             ->get()
             ->map(fn (ProductVariant $variant) => [
+                'variant_id' => (int) $variant->id,
                 'name' => $variant->product->name,
                 'slug' => $variant->product->slug,
                 'variant_name' => $variant->name,
@@ -90,6 +94,10 @@ if (! function_exists('store_page')) {
 
 // Public routes
 Route::get('/', [HomeController::class, 'index'])->name('home');
+
+// Uptime/readiness probe for Railway and external monitors; returns no infrastructure details.
+Route::get('/health', [HealthController::class, 'index'])->middleware('throttle:60,1')->name('health');
+Route::post('/client-errors', [ClientErrorController::class, 'store'])->middleware('throttle:10,1')->name('client-errors.store');
 Route::get('/admin/login', [AdminLoginController::class, 'create'])->name('login');
 Route::post('/admin/login', [AdminLoginController::class, 'store'])->middleware('throttle:5,1')->name('admin.login');
 Route::post('/admin/logout', [AdminLoginController::class, 'destroy'])->middleware('auth')->name('admin.logout');
@@ -125,9 +133,22 @@ Route::get('/policies/{slug}', [PolicyController::class, 'show'])->name('policie
 Route::post('/webhooks/payment', [WebhookController::class, 'handle'])->middleware('throttle:10,1')->name('webhooks.payment');
 Route::post('/webhooks/xentripay', [XentriPayWebhookController::class, 'handle'])->middleware('throttle:30,1')->name('webhooks.xentripay');
 
+// Administrator MFA. These routes require an authenticated session but not the
+// fully verified admin middleware, otherwise login cannot complete.
+Route::middleware('auth')->prefix('admin/mfa')->name('admin.mfa.')->group(function () {
+    Route::get('setup', [AdminMfaController::class, 'setup'])->middleware('throttle:30,1')->name('setup');
+    Route::post('setup', [AdminMfaController::class, 'confirm'])->middleware('throttle:5,1')->name('confirm');
+    Route::get('challenge', [AdminMfaController::class, 'challenge'])->middleware('throttle:30,1')->name('challenge');
+    Route::post('verify', [AdminMfaController::class, 'verify'])->middleware('throttle:5,1')->name('verify');
+});
+
 // Admin routes
 Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(function () {
     Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
+    Route::get('security', [AdminMfaController::class, 'security'])->name('security');
+    Route::post('mfa/recovery-codes', [AdminMfaController::class, 'regenerateRecoveryCodes'])
+        ->middleware('throttle:5,1')
+        ->name('mfa.recovery-codes');
     Route::resource('categories', CategoryController::class);
     Route::resource('products', App\Http\Controllers\Admin\ProductController::class);
     Route::resource('orders', OrderController::class)->only(['index', 'show', 'update']);

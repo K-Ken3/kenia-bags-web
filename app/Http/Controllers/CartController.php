@@ -6,6 +6,7 @@ use App\Http\Requests\StoreCartItemRequest;
 use App\Models\ProductVariant;
 use App\Models\Setting;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Validation\ValidationException;
 
 class CartController extends Controller
@@ -74,21 +75,7 @@ class CartController extends Controller
         $request->session()->put('cart', $cart);
 
         if ($request->expectsJson()) {
-            $cartPreview = ProductVariant::with(['product:id,name,slug', 'product.images'])
-                ->whereIn('id', array_keys($cart))
-                ->where('is_active', true)
-                ->whereHas('product', fn ($query) => $query->where('status', 'active'))
-                ->get()
-                ->map(fn (ProductVariant $cartVariant) => [
-                    'name' => $cartVariant->product->name,
-                    'slug' => $cartVariant->product->slug,
-                    'variant_name' => $cartVariant->name,
-                    'quantity' => (int) $cart[$cartVariant->id],
-                    'price_rwf' => (int) $cartVariant->price_rwf,
-                    'image' => $cartVariant->product->images->first()?->url,
-                    'image_alt' => $cartVariant->product->images->first()?->alt_text ?: $cartVariant->product->name,
-                ])
-                ->values();
+            $cartPreview = $this->cartPreview($cart);
 
             return response()->json([
                 'success' => $variant->product->name.' added to your bag.',
@@ -132,6 +119,37 @@ class CartController extends Controller
         unset($cart[$item]);
         $request->session()->put('cart', $cart);
 
+        if ($request->expectsJson()) {
+            $cartPreview = $this->cartPreview($cart);
+
+            return response()->json([
+                'success' => 'Item removed from your bag.',
+                'cartCount' => $cartPreview->sum('quantity'),
+                'cartPreview' => $cartPreview,
+            ]);
+        }
+
         return back()->with('success', 'Item removed from your bag.');
+    }
+
+    private function cartPreview(array $cart): Collection
+    {
+        return ProductVariant::with(['product:id,name,slug', 'product.images'])
+            ->whereIn('id', array_keys($cart))
+            ->where('is_active', true)
+            ->whereHas('product', fn ($query) => $query->where('status', 'active'))
+            ->get()
+            ->map(fn (ProductVariant $variant) => [
+                'variant_id' => (int) $variant->id,
+                'name' => $variant->product->name,
+                'slug' => $variant->product->slug,
+                'variant_name' => $variant->name,
+                'quantity' => (int) ($cart[$variant->id] ?? 0),
+                'price_rwf' => (int) $variant->price_rwf,
+                'image' => $variant->product->images->first()?->url,
+                'image_alt' => $variant->product->images->first()?->alt_text ?: $variant->product->name,
+            ])
+            ->filter(fn (array $item) => $item['quantity'] > 0)
+            ->values();
     }
 }

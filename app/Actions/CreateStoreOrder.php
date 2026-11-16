@@ -17,7 +17,7 @@ class CreateStoreOrder
     public function execute(array $cart, array $customer, string $idempotencyKey): Order
     {
         if ($existing = Order::where('idempotency_key', $idempotencyKey)->first()) {
-            return $existing;
+            return $this->existingOrderForCustomer($existing, $customer);
         }
 
         if ($cart === []) {
@@ -30,7 +30,7 @@ class CreateStoreOrder
         try {
             return DB::transaction(function () use ($cart, $customer, $idempotencyKey, $deliveryFee, $expiryMinutes) {
                 if ($existing = Order::where('idempotency_key', $idempotencyKey)->first()) {
-                    return $existing;
+                    return $this->existingOrderForCustomer($existing, $customer);
                 }
 
                 $lines = [];
@@ -114,10 +114,42 @@ class CreateStoreOrder
         } catch (UniqueConstraintViolationException $exception) {
             $existing = Order::where('idempotency_key', $idempotencyKey)->first();
             if ($existing) {
-                return $existing;
+                return $this->existingOrderForCustomer($existing, $customer);
             }
 
             throw $exception;
         }
+    }
+
+    /**
+     * An idempotency key must never grant one customer access to another
+     * customer's order. Replays are only honoured for the same phone number.
+     */
+    private function existingOrderForCustomer(Order $order, array $customer): Order
+    {
+        $submitted = $this->normalizePhone((string) ($customer['customer_phone'] ?? ''));
+        $stored = $this->normalizePhone((string) $order->customer_phone);
+
+        if ($submitted === '' || $submitted !== $stored) {
+            throw ValidationException::withMessages([
+                'idempotency_key' => 'This checkout request has already been used. Please start a new checkout.',
+            ]);
+        }
+
+        return $order;
+    }
+
+    private function normalizePhone(string $phone): string
+    {
+        $digits = (string) preg_replace('/\D+/', '', $phone);
+
+        if (str_starts_with($digits, '250')) {
+            $digits = '0'.substr($digits, 3);
+        }
+        if (strlen($digits) === 9) {
+            $digits = '0'.$digits;
+        }
+
+        return $digits;
     }
 }

@@ -45,6 +45,23 @@ class CartTest extends StoreTestCase
             ->assertJsonValidationErrors('quantity');
     }
 
+    public function test_customer_can_remove_a_variant_with_a_json_response_for_the_bag_drawer(): void
+    {
+        [, , $variant] = $this->createStoreProduct();
+
+        $this->postJson('/cart/add', ['variant_id' => $variant->id, 'quantity' => 2])
+            ->assertCreated()
+            ->assertJsonPath('cartPreview.0.variant_id', $variant->id);
+
+        $this->deleteJson('/cart/'.$variant->id)
+            ->assertOk()
+            ->assertJsonPath('success', 'Item removed from your bag.')
+            ->assertJsonPath('cartCount', 0)
+            ->assertJsonPath('cartPreview', []);
+
+        $this->get('/cart')->assertSee('"items":[]', false);
+    }
+
     public function test_customer_cannot_add_more_than_available_stock(): void
     {
         [, , $variant] = $this->createStoreProduct(stock: 1);

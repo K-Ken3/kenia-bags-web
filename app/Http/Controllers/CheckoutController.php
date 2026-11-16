@@ -32,6 +32,7 @@ class CheckoutController extends Controller
             }
 
             $price = (int) $variant->price_rwf;
+
             return [
                 'variant_id' => $variant->id,
                 'name' => $variant->product->name,

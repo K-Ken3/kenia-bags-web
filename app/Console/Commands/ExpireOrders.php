@@ -43,6 +43,7 @@ class ExpireOrders extends Command
         }
 
         $this->info($orders->count().' unpaid order(s) expired.');
+
         return self::SUCCESS;
     }
 }

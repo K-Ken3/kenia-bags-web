@@ -6,6 +6,7 @@ use App\Models\Category;
 use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Models\Setting;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 use Tests\TestCase;
@@ -51,6 +52,28 @@ abstract class StoreTestCase extends TestCase
         Setting::updateOrCreate(['key' => 'manual_momo_enabled'], ['value' => '1']);
         Setting::updateOrCreate(['key' => 'momo_pay_code'], ['value' => 'TEST-PAY-CODE']);
         Setting::updateOrCreate(['key' => 'delivery_fee_confirmed'], ['value' => '1']);
+    }
+
+    protected function createVerifiedAdmin(array $attributes = []): User
+    {
+        $admin = User::factory()->create(array_merge(['role' => 'admin'], $attributes));
+        $admin->forceFill([
+            'two_factor_secret' => 'JBSWY3DPEHPK3PXP',
+            'two_factor_confirmed_at' => now(),
+        ])->save();
+
+        return $admin;
+    }
+
+    protected function actingAsVerifiedAdmin(?User $admin = null)
+    {
+        $admin ??= $this->createVerifiedAdmin();
+
+        return $this->actingAs($admin)->withSession([
+            'admin_mfa_verified_at' => now()->getTimestamp(),
+            'admin_login_at' => now()->getTimestamp(),
+            'admin_last_activity' => now()->getTimestamp(),
+        ]);
     }
 
     protected function checkoutPayload(array $overrides = []): array

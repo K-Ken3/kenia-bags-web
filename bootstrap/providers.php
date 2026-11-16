@@ -1,7 +1,11 @@
 <?php
 
+use App\Providers\AppServiceProvider;
+use App\Providers\InertiaServiceProvider;
+use App\Providers\PaymentServiceProvider;
+
 return [
-    App\Providers\AppServiceProvider::class,
-    App\Providers\InertiaServiceProvider::class,
-    App\Providers\PaymentServiceProvider::class,
+    AppServiceProvider::class,
+    InertiaServiceProvider::class,
+    PaymentServiceProvider::class,
 ];

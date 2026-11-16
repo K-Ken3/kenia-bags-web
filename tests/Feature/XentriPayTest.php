@@ -8,6 +8,7 @@ use App\Models\Payment;
 use App\Models\PaymentEvent;
 use App\Models\Setting;
 use Illuminate\Http\Client\Request as ClientRequest;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 
@@ -370,6 +371,164 @@ class XentriPayTest extends StoreTestCase
 
         $this->assertSame('paid', $order->fresh()->payment_status);
         $this->assertSame(4, $variant->fresh()->stock_quantity);
+    }
+
+    public function test_signed_success_webhook_without_an_amount_is_rejected(): void
+    {
+        [$order] = $this->createXentriPayOrder();
+        $body = json_encode([
+            'event' => 'COLLECTION_SUCCESSFUL',
+            'data' => [
+                'status' => 'SUCCESSFUL',
+                'reference' => 'REF-1',
+                'currency' => 'RWF',
+            ],
+            'idempotencyKey' => 'idem-no-amount',
+        ]);
+
+        $this->postRawWebhook($body, 'sha256='.hash_hmac('sha256', $body, 'whsec-test'))
+            ->assertStatus(422);
+
+        $this->assertSame('pending', $order->fresh()->payment_status);
+        $this->assertDatabaseCount('payment_events', 0);
+    }
+
+    public function test_signed_webhook_with_a_wrong_currency_is_rejected(): void
+    {
+        [$order, $payment] = $this->createXentriPayOrder();
+        $body = json_encode([
+            'event' => 'COLLECTION_SUCCESSFUL',
+            'data' => [
+                'status' => 'SUCCESSFUL',
+                'reference' => 'REF-1',
+                'amount' => 42000,
+                'currency' => 'USD',
+            ],
+            'idempotencyKey' => 'idem-wrong-currency',
+        ]);
+
+        $this->postRawWebhook($body, 'sha256='.hash_hmac('sha256', $body, 'whsec-test'))
+            ->assertStatus(422);
+
+        $this->assertSame('pending', $payment->fresh()->status);
+        $this->assertSame('pending', $order->fresh()->payment_status);
+        $this->assertDatabaseCount('payment_events', 0);
+    }
+
+    public function test_webhook_for_an_unknown_reference_is_ignored(): void
+    {
+        [$order, $payment] = $this->createXentriPayOrder();
+        $body = json_encode([
+            'event' => 'COLLECTION_SUCCESSFUL',
+            'data' => [
+                'status' => 'SUCCESSFUL',
+                'reference' => 'REF-NOT-OURS',
+                'amount' => 42000,
+                'currency' => 'RWF',
+            ],
+            'idempotencyKey' => 'idem-unknown-reference',
+        ]);
+
+        $this->postRawWebhook($body, 'sha256='.hash_hmac('sha256', $body, 'whsec-test'))
+            ->assertOk()
+            ->assertJson(['processed' => false, 'reason' => 'unknown_reference']);
+
+        $this->assertSame('pending', $payment->fresh()->status);
+        $this->assertSame('pending', $order->fresh()->payment_status);
+        $this->assertDatabaseCount('payment_events', 0);
+    }
+
+    public function test_late_failure_webhook_does_not_downgrade_a_paid_order(): void
+    {
+        [$order, $payment, $variant] = $this->createXentriPayOrder();
+
+        $success = json_encode([
+            'event' => 'COLLECTION_SUCCESSFUL',
+            'data' => ['status' => 'SUCCESSFUL', 'reference' => 'REF-1', 'amount' => 42000, 'currency' => 'RWF'],
+            'idempotencyKey' => 'idem-paid-first',
+        ]);
+        $this->postRawWebhook($success, 'sha256='.hash_hmac('sha256', $success, 'whsec-test'))
+            ->assertOk()
+            ->assertJson(['processed' => true]);
+
+        $lateFailure = json_encode([
+            'event' => 'COLLECTION_FAILED',
+            'data' => ['status' => 'FAILED', 'reference' => 'REF-1', 'amount' => 42000, 'currency' => 'RWF'],
+            'idempotencyKey' => 'idem-failure-after-success',
+        ]);
+        $this->postRawWebhook($lateFailure, 'sha256='.hash_hmac('sha256', $lateFailure, 'whsec-test'))
+            ->assertOk();
+
+        $this->assertSame('paid', $payment->fresh()->status);
+        $this->assertSame('paid', $order->fresh()->payment_status);
+        $this->assertSame('confirmed', $order->fresh()->order_status);
+        $this->assertSame(4, $variant->fresh()->stock_quantity);
+        $this->assertSame(0, $variant->fresh()->reserved);
+    }
+
+    public function test_failure_then_success_webhook_confirms_the_order(): void
+    {
+        [$order, $payment, $variant] = $this->createXentriPayOrder();
+
+        $failure = json_encode([
+            'event' => 'COLLECTION_FAILED',
+            'data' => ['status' => 'FAILED', 'reference' => 'REF-1', 'amount' => 42000, 'currency' => 'RWF'],
+            'idempotencyKey' => 'idem-failure-first',
+        ]);
+        $this->postRawWebhook($failure, 'sha256='.hash_hmac('sha256', $failure, 'whsec-test'))->assertOk();
+        $this->assertSame('failed', $payment->fresh()->status);
+
+        $success = json_encode([
+            'event' => 'COLLECTION_SUCCESSFUL',
+            'data' => ['status' => 'SUCCESSFUL', 'reference' => 'REF-1', 'amount' => 42000, 'currency' => 'RWF'],
+            'idempotencyKey' => 'idem-success-after-failure',
+        ]);
+        $this->postRawWebhook($success, 'sha256='.hash_hmac('sha256', $success, 'whsec-test'))->assertOk();
+
+        $this->assertSame('paid', $payment->fresh()->status);
+        $this->assertSame('paid', $order->fresh()->payment_status);
+        $this->assertSame('confirmed', $order->fresh()->order_status);
+        $this->assertSame(4, $variant->fresh()->stock_quantity);
+        $this->assertSame(0, $variant->fresh()->reserved);
+    }
+
+    public function test_payment_arriving_after_order_expiry_is_not_auto_confirmed(): void
+    {
+        [$order, $payment, $variant] = $this->createXentriPayOrder();
+        DB::table('orders')->where('id', $order->id)->update(['expires_at' => now()->subMinute()]);
+
+        $this->artisan('app:expire-orders')->assertSuccessful();
+        $this->assertSame('expired', $payment->fresh()->status);
+        $this->assertSame('cancelled', $order->fresh()->order_status);
+        $this->assertSame(0, $variant->fresh()->reserved);
+
+        $body = json_encode([
+            'event' => 'COLLECTION_SUCCESSFUL',
+            'data' => ['status' => 'SUCCESSFUL', 'reference' => 'REF-1', 'amount' => 42000, 'currency' => 'RWF'],
+            'idempotencyKey' => 'idem-after-expiry',
+        ]);
+        $this->postRawWebhook($body, 'sha256='.hash_hmac('sha256', $body, 'whsec-test'))
+            ->assertOk()
+            ->assertJson(['processed' => true]);
+
+        $this->assertSame('paid', $payment->fresh()->status);
+        $this->assertSame('cancelled', $order->fresh()->order_status);
+        $this->assertSame('expired', $order->fresh()->payment_status);
+        $this->assertSame(5, $variant->fresh()->stock_quantity);
+        $this->assertSame(0, $variant->fresh()->reserved);
+    }
+
+    public function test_retry_is_rejected_while_an_attempt_is_still_pending(): void
+    {
+        [$order] = $this->createXentriPayOrder();
+
+        $this->withSession(['verified_order_reference' => $order->public_reference])
+            ->post('/order/'.$order->public_reference.'/xentripay/retry')
+            ->assertRedirect()
+            ->assertSessionHas('error');
+
+        $this->assertDatabaseCount('payments', 1);
+        Http::assertNothingSent();
     }
 
     private function xentriPayPayload(array $overrides = []): array

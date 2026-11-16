@@ -2,6 +2,9 @@ import React from 'react';
 import type { ResolvedComponent } from '@inertiajs/react';
 import { createRoot } from 'react-dom/client';
 import { StoreContext, type StoreCartItem } from './Components/StoreContext';
+import { installClientErrorReporting } from './monitoring';
+
+installClientErrorReporting();
 
 type InertiaPageModule = {
   default: ResolvedComponent;

@@ -56,6 +56,37 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Trusted Proxy and Host Configuration
+    |--------------------------------------------------------------------------
+    |
+    | TRUSTED_PROXIES is a comma-separated list of exact proxy IPs/CIDRs. When
+    | set, Laravel's standard trusted-proxy handling is used. When empty, the
+    | application normalizes Railway-style forwarded headers itself: only the
+    | rightmost X-Forwarded-For value (the one appended by the platform edge)
+    | is trusted. TRUST_PROXY_HEADERS defaults to true on Railway.
+    |
+    | TRUSTED_HOSTS is a comma-separated list of allowed Host header values.
+    | It defaults to the host component of APP_URL.
+    |
+    */
+
+    'trusted_proxies' => array_values(array_filter(array_map(
+        'trim',
+        explode(',', (string) env('TRUSTED_PROXIES', '')),
+    ))),
+
+    'trust_proxy_headers' => filter_var(
+        env('TRUST_PROXY_HEADERS', env('RAILWAY_ENVIRONMENT') !== null ? 'true' : 'false'),
+        FILTER_VALIDATE_BOOL,
+    ),
+
+    'trusted_hosts' => array_values(array_filter(array_map(
+        'trim',
+        explode(',', (string) env('TRUSTED_HOSTS', (string) parse_url((string) env('APP_URL', ''), PHP_URL_HOST))),
+    ))),
+
+    /*
+    |--------------------------------------------------------------------------
     | Application Timezone
     |--------------------------------------------------------------------------
     |

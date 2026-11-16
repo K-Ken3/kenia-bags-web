@@ -2,8 +2,9 @@
 
 return [
     'sandbox_enabled' => (bool) env('PAYMENT_SANDBOX_ENABLED', false),
+    // The generic webhook is disabled unless both this flag and a secret are configured.
+    'webhook_enabled' => (bool) env('PAYMENT_WEBHOOK_ENABLED', false),
     'webhook_secret' => env('PAYMENT_WEBHOOK_SECRET'),
-    'require_webhook_signature' => env('PAYMENT_REQUIRE_WEBHOOK_SIGNATURE', false),
 
     'xentripay' => [
         'enabled' => (bool) env('XENTRIPAY_ENABLED', false),

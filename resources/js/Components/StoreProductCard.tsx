@@ -33,8 +33,10 @@ export default function StoreProductCard({ product, priority = false }: Props) {
         String(availableVariants.find((variant) => variant.stock_quantity > variant.reserved)?.id || availableVariants[0]?.id || ''),
     );
     const [isAdding, setIsAdding] = React.useState(false);
+    const [justAdded, setJustAdded] = React.useState(false);
     const [cartMessage, setCartMessage] = React.useState('');
     const [cartError, setCartError] = React.useState('');
+    const addedTimer = React.useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
     const selectedVariant = availableVariants.find((variant) => String(variant.id) === selectedVariantId);
     const available = selectedVariant ? selectedVariant.stock_quantity > selectedVariant.reserved : false;
     const demoImage = image?.url
@@ -42,17 +44,23 @@ export default function StoreProductCard({ product, priority = false }: Props) {
         : shared.demoProductImages?.[(Math.abs(product.id) - 1) % shared.demoProductImages.length];
     const price = new Intl.NumberFormat('en').format(Number(selectedVariant?.price_rwf ?? product.price_rwf));
 
+    React.useEffect(() => () => clearTimeout(addedTimer.current), []);
+
     const handleAddToCart = async (event: React.FormEvent<HTMLFormElement>) => {
         event.preventDefault();
         setIsAdding(true);
         setCartMessage('');
         setCartError('');
+        setJustAdded(false);
 
         try {
             const result = await addCartForm(event.currentTarget);
             shared.setCartCount?.(result.cartCount);
             shared.setCartPreview?.(result.cartPreview);
             setCartMessage(result.success);
+            setJustAdded(true);
+            clearTimeout(addedTimer.current);
+            addedTimer.current = setTimeout(() => setJustAdded(false), 1600);
         } catch (error) {
             setCartError(error instanceof Error ? error.message : 'Unable to add this item to your bag.');
         } finally {
@@ -80,19 +88,19 @@ export default function StoreProductCard({ product, priority = false }: Props) {
                     )}
                 </a>
                 {product.is_featured && (
-                    <span className="absolute left-3 top-3 border border-[var(--hairline)] bg-white/95 px-2.5 py-1 text-[0.62rem] font-semibold uppercase tracking-wider text-[var(--chocolate)]">
+                    <span className="store-pill absolute left-3 top-3 border-[var(--beige)] bg-[var(--surface)] shadow-[var(--shadow-soft)]">
                         Selected
                     </span>
                 )}
             </div>
-            <div className="flex items-start justify-between gap-3 pt-3">
+            <div className="flex items-start justify-between gap-3 pt-3.5">
                 <div className="min-w-0">
-                    {product.category?.name && <p className="mb-1 text-[0.62rem] uppercase tracking-[0.13em] text-[var(--muted)]">{product.category.name}</p>}
-                    <h3 className="font-medium leading-snug text-[var(--charcoal)] group-hover:text-[var(--chocolate-soft)]">
+                    {product.category?.name && <p className="mb-1.5 text-[0.62rem] uppercase tracking-[0.14em] text-[var(--muted)]">{product.category.name}</p>}
+                    <h3 className="text-[0.95rem] font-semibold leading-snug tracking-tight text-[var(--charcoal)] group-hover:text-[var(--chocolate-soft)]">
                         <a href={`/products/${product.slug}`}>{product.name}</a>
                     </h3>
                 </div>
-                <p className="shrink-0 text-sm font-medium text-[var(--chocolate)]">RWF {price}</p>
+                <p className="shrink-0 text-sm font-semibold text-[var(--chocolate)]">RWF {price}</p>
             </div>
             <form action="/cart/add" method="post" className="mt-3" onSubmit={handleAddToCart}>
                 <input type="hidden" name="_token" value={(document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content || ''} />
@@ -116,8 +124,8 @@ export default function StoreProductCard({ product, priority = false }: Props) {
                 {availableVariants.length === 1 && <input type="hidden" name="variant_id" value={availableVariants[0].id} />}
                 <input type="hidden" name="quantity" value="1" />
                 <div className="store-product-actions">
-                    <button type="submit" disabled={!available || isAdding} className="store-product-action store-product-add disabled:cursor-not-allowed disabled:opacity-50">
-                        {isAdding ? 'Adding...' : available ? 'Add to cart' : 'Out of stock'}
+                    <button type="submit" disabled={!available || isAdding} className={`store-product-action store-product-add disabled:cursor-not-allowed disabled:opacity-50${justAdded ? ' is-added' : ''}`}>
+                        {isAdding ? 'Adding...' : justAdded ? 'Added ✓' : available ? 'Add to cart' : 'Out of stock'}
                     </button>
                     <a href={`/products/${product.slug}`} className="store-product-action store-product-info">More info</a>
                 </div>

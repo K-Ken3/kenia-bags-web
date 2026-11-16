@@ -2,8 +2,10 @@
 
 namespace Tests\Feature;
 
-use App\Models\PolicyPage;
+use App\Models\Category;
 use App\Models\Order;
+use App\Models\PolicyPage;
+use App\Models\Product;
 use App\Models\Setting;
 use App\Models\User;
 use Illuminate\Http\UploadedFile;
@@ -21,10 +23,10 @@ class AdminTest extends StoreTestCase
 
     public function test_admin_can_create_and_archive_a_product(): void
     {
-        $admin = User::factory()->create(['role' => 'admin']);
-        $category = \App\Models\Category::create(['name' => 'Totes', 'slug' => 'totes']);
+        $admin = $this->createVerifiedAdmin();
+        $category = Category::create(['name' => 'Totes', 'slug' => 'totes']);
 
-        $this->actingAs($admin)->post('/admin/products', [
+        $this->actingAsVerifiedAdmin($admin)->post('/admin/products', [
             'category_id' => $category->id,
             'name' => 'Admin Tote',
             'slug' => 'admin-tote',
@@ -37,7 +39,7 @@ class AdminTest extends StoreTestCase
             ],
         ])->assertRedirect();
 
-        $product = \App\Models\Product::where('slug', 'admin-tote')->firstOrFail();
+        $product = Product::where('slug', 'admin-tote')->firstOrFail();
         $this->assertSame(25000, $product->price_rwf);
         $this->assertSame(3, $product->variants()->firstOrFail()->stock_quantity);
         $this->delete('/admin/products/'.$product->id)->assertRedirect();
@@ -46,7 +48,7 @@ class AdminTest extends StoreTestCase
 
     public function test_admin_cannot_confirm_or_dispatch_an_unpaid_order(): void
     {
-        $admin = User::factory()->create(['role' => 'admin']);
+        $admin = $this->createVerifiedAdmin();
         $order = Order::create([
             'public_reference' => 'KB-'.Str::upper(Str::random(24)),
             'customer_name' => 'Test Customer',
@@ -58,7 +60,7 @@ class AdminTest extends StoreTestCase
             'payment_status' => 'pending',
         ]);
 
-        $this->actingAs($admin)
+        $this->actingAsVerifiedAdmin($admin)
             ->put('/admin/orders/'.$order->public_reference, ['order_status' => 'confirmed'])
             ->assertSessionHasErrors('order_status');
         $this->put('/admin/orders/'.$order->public_reference, ['order_status' => 'packing'])
@@ -70,9 +72,9 @@ class AdminTest extends StoreTestCase
     public function test_admin_can_upload_and_reencode_brand_logo_and_update_store_details(): void
     {
         Storage::fake('public');
-        $admin = User::factory()->create(['role' => 'admin']);
+        $admin = $this->createVerifiedAdmin();
 
-        $response = $this->actingAs($admin)->put('/admin/settings', [
+        $response = $this->actingAsVerifiedAdmin($admin)->put('/admin/settings', [
             'brand_name' => 'Test Store',
             'brand_logo' => UploadedFile::fake()->image('logo.png', 100, 100),
             'contact_email' => 'store@example.test',
@@ -95,9 +97,9 @@ class AdminTest extends StoreTestCase
 
     public function test_admin_can_edit_multiple_variants_without_deactivating_other_options(): void
     {
-        $admin = User::factory()->create(['role' => 'admin']);
-        $category = \App\Models\Category::create(['name' => 'Totes', 'slug' => 'totes']);
-        $this->actingAs($admin)->post('/admin/products', [
+        $admin = $this->createVerifiedAdmin();
+        $category = Category::create(['name' => 'Totes', 'slug' => 'totes']);
+        $this->actingAsVerifiedAdmin($admin)->post('/admin/products', [
             'category_id' => $category->id,
             'name' => 'Colour Tote',
             'slug' => 'colour-tote',
@@ -108,7 +110,7 @@ class AdminTest extends StoreTestCase
                 ['name' => 'Black', 'colour' => 'Black', 'price_rwf' => 26000, 'stock_quantity' => 2],
             ],
         ])->assertRedirect();
-        $product = \App\Models\Product::where('slug', 'colour-tote')->firstOrFail();
+        $product = Product::where('slug', 'colour-tote')->firstOrFail();
         $variants = $product->variants()->orderBy('id')->get();
 
         $this->put('/admin/products/'.$product->id, [
@@ -140,7 +142,7 @@ class AdminTest extends StoreTestCase
 
     public function test_admin_can_edit_policy_content_but_public_draft_stays_hidden(): void
     {
-        $admin = User::factory()->create(['role' => 'admin']);
+        $admin = $this->createVerifiedAdmin();
         $policy = PolicyPage::create([
             'slug' => 'privacy',
             'title' => 'Privacy',
@@ -149,7 +151,7 @@ class AdminTest extends StoreTestCase
         ]);
         $this->get('/policies/privacy')->assertNotFound();
 
-        $this->actingAs($admin)->put('/admin/policies/'.$policy->id, [
+        $this->actingAsVerifiedAdmin($admin)->put('/admin/policies/'.$policy->id, [
             'title' => 'Privacy information',
             'body' => 'Reviewed test policy.',
             'is_published' => '1',

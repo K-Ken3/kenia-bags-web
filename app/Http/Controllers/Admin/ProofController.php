@@ -2,8 +2,8 @@
 
 namespace App\Http\Controllers\Admin;
 
-use App\Http\Controllers\Controller;
 use App\Actions\OrderInventory;
+use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
 use App\Models\Order;
 use App\Models\PaymentProof;
@@ -24,8 +24,9 @@ class ProofController extends Controller
 
     public function show(PaymentProof $proof)
     {
-        abort_unless(auth()->user() && auth()->user()->is_admin, 403);
+        abort_unless(auth()->user()?->isAdmin() === true, 403);
         abort_unless(Storage::disk('local')->exists($proof->path), 404);
+
         return Storage::disk('local')->response($proof->path);
     }
 

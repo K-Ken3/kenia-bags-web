@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\CategoryUpsertRequest;
+use App\Models\AuditLog;
 use App\Models\Category;
 
 class CategoryController extends Controller
@@ -22,7 +23,9 @@ class CategoryController extends Controller
 
     public function store(CategoryUpsertRequest $request)
     {
-        Category::create($request->validated() + ['is_active' => $request->boolean('is_active', true)]);
+        $category = Category::create($request->validated() + ['is_active' => $request->boolean('is_active', true)]);
+        $this->audit('category.created', $category);
+
         return redirect()->route('admin.categories.index')->with('success', 'Category created.');
     }
 
@@ -39,6 +42,8 @@ class CategoryController extends Controller
     public function update(CategoryUpsertRequest $request, Category $category)
     {
         $category->update($request->validated() + ['is_active' => $request->boolean('is_active')]);
+        $this->audit('category.updated', $category);
+
         return redirect()->route('admin.categories.index')->with('success', 'Category updated.');
     }
 
@@ -48,6 +53,25 @@ class CategoryController extends Controller
             return back()->withErrors(['category' => 'Move or archive the category products before deleting it.']);
         }
         $category->delete();
+        AuditLog::create([
+            'user_id' => auth()->id(),
+            'action' => 'category.deleted',
+            'subject_type' => Category::class,
+            'subject_id' => $category->id,
+            'metadata' => ['slug' => $category->slug],
+        ]);
+
         return redirect()->route('admin.categories.index')->with('success', 'Category deleted.');
+    }
+
+    private function audit(string $action, Category $category): void
+    {
+        AuditLog::create([
+            'user_id' => auth()->id(),
+            'action' => $action,
+            'subject_type' => Category::class,
+            'subject_id' => $category->id,
+            'metadata' => ['slug' => $category->slug, 'is_active' => $category->is_active],
+        ]);
     }
 }

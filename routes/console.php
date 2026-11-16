@@ -10,3 +10,5 @@ Artisan::command('inspire', function () {
 
 Schedule::command('app:expire-orders')->everyFiveMinutes()->withoutOverlapping();
 Schedule::command('app:poll-xentripay')->everyMinute()->withoutOverlapping();
+Schedule::command('ops:monitor')->everyFiveMinutes()->withoutOverlapping();
+Schedule::command('ops:prune-events')->daily()->withoutOverlapping();

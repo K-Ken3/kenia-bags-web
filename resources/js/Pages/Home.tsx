@@ -4,6 +4,7 @@ import StoreFooter from '../Components/StoreFooter';
 import StoreHeader from '../Components/StoreHeader';
 import StoreProductCard from '../Components/StoreProductCard';
 import StatusMessages from '../Components/StatusMessages';
+import Reveal from '../Components/Reveal';
 import { StoreContext } from '../Components/StoreContext';
 
 type Category = {
@@ -94,22 +95,22 @@ export default function Home({
             <StoreHeader brandName={brandName} cartCount={cartCount} announcement={deliveryInformation} />
             <StatusMessages flash={flash} errors={errors} />
 
-            <main>
-                <section className="bg-white">
+            <main className="store-page">
+                <section>
                     <div className="mx-auto grid max-w-[88rem] items-center gap-8 px-4 py-8 sm:px-6 sm:py-12 lg:grid-cols-[0.88fr_1.12fr] lg:gap-14 lg:px-10 lg:py-14">
-                        <div className="order-2 py-3 lg:order-1 lg:py-8">
+                        <div className="store-hero-copy order-2 py-3 lg:order-1 lg:py-8">
                             <p className="store-kicker text-[var(--chocolate-soft)]">A little more lovely, every day</p>
-                            <h1 className="store-display mt-5 max-w-2xl text-[var(--chocolate)]">Carry your style, everywhere.</h1>
+                            <h1 className="store-display mt-5 max-w-2xl text-[var(--chocolate)]">Carry your style, <em className="store-accent-word">everywhere</em>.</h1>
                             <p className="mt-5 max-w-lg text-base leading-7 text-[var(--muted)] sm:text-lg sm:leading-8">
                                 Beautifully chosen bags and everyday essentials for the modern woman.
                             </p>
                             <div className="mt-7 flex flex-wrap gap-3">
                                 <a href="/shop" className="store-primary-button">Shop the collection</a>
-                                <a href="/shop?sort=newest" className="inline-flex min-h-[3.25rem] items-center border border-[var(--hairline)] px-5 text-xs font-semibold uppercase tracking-[0.12em] text-[var(--chocolate)] hover:bg-[var(--chocolate-wash)]">
+                                <a href="/shop?sort=newest" className="inline-flex min-h-[3.25rem] items-center rounded-full border border-[var(--beige)] bg-[var(--paper)] px-6 text-xs font-semibold uppercase tracking-[0.1em] text-[var(--chocolate)] hover:border-[var(--hairline)] hover:bg-[var(--chocolate-wash)]">
                                     Explore the shop
                                 </a>
                             </div>
-                            <p className="mt-8 border-t border-[var(--hairline)] pt-4 text-xs uppercase tracking-[0.14em] text-[var(--muted)]">
+                            <p className="mt-8 border-t border-[var(--hairline)] pt-5 text-xs uppercase tracking-[0.14em] text-[var(--muted)]">
                                 Thoughtfully selected · Prices shown in RWF
                             </p>
                         </div>
@@ -147,7 +148,7 @@ export default function Home({
                                                 height={900}
                                                 loading="eager"
                                                 fetchPriority={index === 0 ? 'high' : 'low'}
-                                                className="absolute inset-0 h-full w-full object-cover transition-transform duration-700 group-hover:scale-[1.025]"
+                                                className="store-hero-image absolute inset-0 h-full w-full object-cover transition-transform duration-700 group-hover:scale-[1.025]"
                                             />
                                         ) : (
                                             <div className="absolute inset-0 grid place-items-center">
@@ -185,25 +186,25 @@ export default function Home({
                 {categories.length > 0 && (
                     <section className="mx-auto max-w-[88rem] px-4 py-6 sm:px-6 sm:py-10 lg:px-10 lg:py-16">
                         <div className="mb-4 flex flex-wrap items-end justify-between gap-2 sm:mb-7 sm:gap-4">
-                            <div>
+                            <Reveal>
                                 <p className="store-kicker hidden sm:block">Find your favorite</p>
                                 <h2 className="store-section-title mt-1 text-[var(--chocolate)] sm:mt-2">Shop by category</h2>
-                            </div>
+                            </Reveal>
                             <a href="/shop" className="min-h-9 content-center text-[0.62rem] font-semibold uppercase tracking-wider text-[var(--chocolate)] underline underline-offset-4 sm:min-h-11 sm:text-xs">All collections</a>
                         </div>
                         <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-3 lg:gap-4">
                             {categories.map((category, index) => (
+                                <Reveal key={category.id} delay={Math.min(index, 6) * 60} className="min-w-0">
                                 <a
-                                    key={category.id}
                                     href={`/shop?category=${encodeURIComponent(category.slug)}`}
-                                    className="group flex min-h-24 min-w-0 items-center gap-2 border border-[var(--hairline)] bg-white p-2 hover:border-[var(--beige)] hover:bg-[var(--chocolate-wash)] sm:min-h-32 sm:gap-4 sm:p-4 lg:min-h-40 lg:gap-6 lg:p-5"
+                                    className="store-lift group flex h-full min-h-24 min-w-0 items-center gap-2 rounded-[20px] border border-[var(--hairline)] bg-[var(--surface)] p-2 hover:border-[var(--beige)] hover:bg-[var(--paper)] sm:min-h-32 sm:gap-4 sm:p-4 lg:min-h-40 lg:gap-6 lg:p-5"
                                 >
                                     {shared.demoProductImages?.length ? (
                                         <img
                                             src={shared.demoProductImages[index % shared.demoProductImages.length]}
                                             alt={`Temporary demo bag photo for ${category.name}`}
                                             loading="lazy"
-                                            className="aspect-square w-14 shrink-0 object-cover sm:w-20 lg:w-28"
+                                            className="aspect-square w-14 shrink-0 rounded-[14px] object-cover sm:w-20 lg:w-28"
                                         />
                                     ) : (
                                         <div className="store-category-art grid aspect-square w-14 shrink-0 place-items-center sm:w-20 lg:w-28">
@@ -212,28 +213,31 @@ export default function Home({
                                     )}
                                     <h3 className="min-w-0 font-serif text-[0.85rem] leading-tight text-[var(--chocolate)] sm:text-lg lg:text-2xl">{category.name}</h3>
                                 </a>
+                                </Reveal>
                             ))}
                         </div>
                     </section>
                 )}
 
-                <section className="bg-white py-12 sm:py-16">
+                <section className="bg-[var(--surface)] py-12 sm:py-16">
                     <div className="mx-auto max-w-[88rem] px-4 sm:px-6 lg:px-10">
                         <div className="mb-7 flex flex-wrap items-end justify-between gap-4">
-                            <div>
+                            <Reveal>
                                 <p className="store-kicker">The Isimbi Mart edit</p>
-                                <h2 className="store-section-title mt-2 text-[var(--chocolate)]">Chosen for everyday</h2>
-                            </div>
+                                <h2 className="store-section-title mt-2 text-[var(--chocolate)]">Chosen for <em className="store-accent-word">everyday</em></h2>
+                            </Reveal>
                             <a href="/shop" className="min-h-11 content-center text-xs font-semibold uppercase tracking-wider text-[var(--chocolate)] underline underline-offset-4">View all bags</a>
                         </div>
                         {featured.length > 0 ? (
                             <div className="grid grid-cols-2 gap-x-4 gap-y-8 sm:gap-x-6 lg:grid-cols-4 lg:gap-y-10">
                                 {featured.slice(0, 4).map((product, index) => (
-                                    <StoreProductCard key={product.id} product={product} priority={index < 2} />
+                                    <Reveal key={product.id} delay={index * 70} className="min-w-0">
+                                        <StoreProductCard product={product} priority={index < 2} />
+                                    </Reveal>
                                 ))}
                             </div>
                         ) : (
-                            <div className="border border-[var(--hairline)] bg-[var(--ivory)] p-8 text-center">
+                            <div className="rounded-[20px] border border-[var(--hairline)] bg-[var(--ivory)] p-8 text-center">
                                 <p className="text-[var(--muted)]">The collection is being prepared.</p>
                                 <a href="/shop" className="mt-3 inline-block text-sm font-semibold text-[var(--chocolate)] underline underline-offset-4">Explore the shop</a>
                             </div>
@@ -248,10 +252,10 @@ export default function Home({
                                 || shared.demoProductImages?.[index % (shared.demoProductImages.length || 1)];
 
                             return (
+                                <Reveal key={category.id} delay={index * 90} className="min-w-0">
                                 <a
-                                    key={category.id}
                                     href={`/shop?category=${encodeURIComponent(category.slug)}`}
-                                    className={`store-promo-art group relative flex min-h-44 items-center justify-between gap-3 overflow-hidden border border-[var(--hairline)] p-4 sm:min-h-72 sm:p-8${imageUrl ? ' has-image' : ''}`}
+                                    className={`store-promo-art store-lift group relative flex h-full min-h-44 items-center justify-between gap-3 overflow-hidden border border-[var(--hairline)] p-4 sm:min-h-72 sm:p-8${imageUrl ? ' has-image' : ''}`}
                                 >
                                     {imageUrl ? (
                                         <img
@@ -273,6 +277,7 @@ export default function Home({
                                         </span>
                                     </div>
                                 </a>
+                                </Reveal>
                             );
                         })}
                     </section>

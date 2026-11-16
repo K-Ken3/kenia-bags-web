@@ -1,6 +1,7 @@
 import { createContext } from 'react';
 
 export type StoreCartItem = {
+    variant_id: number;
     name: string;
     slug: string;
     variant_name: string;
@@ -35,6 +36,7 @@ function isStoreCartItem(value: unknown): value is StoreCartItem {
     }
 
     return typeof value.name === 'string'
+        && typeof value.variant_id === 'number'
         && typeof value.slug === 'string'
         && typeof value.variant_name === 'string'
         && typeof value.quantity === 'number'

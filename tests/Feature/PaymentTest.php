@@ -5,14 +5,12 @@ namespace Tests\Feature;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Payment;
-use App\Models\PaymentEvent;
 use App\Models\PaymentProof;
-use App\Models\User;
 use App\Payments\SandboxProvider;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
-use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 class PaymentTest extends StoreTestCase
@@ -38,13 +36,13 @@ class PaymentTest extends StoreTestCase
     public function test_admin_can_approve_or_reject_manual_payment_proofs(): void
     {
         Storage::fake('local');
-        $admin = User::factory()->create(['role' => 'admin']);
+        $admin = $this->createVerifiedAdmin();
         [$order, $payment, $variant] = $this->createManualOrder(withItem: true);
         $payment->update(['status' => 'under_review']);
         $order->update(['payment_status' => 'under_review', 'order_status' => 'payment_review', 'status' => 'payment_review']);
         $approvedProof = $this->createProof($order, $payment);
 
-        $this->actingAs($admin)
+        $this->actingAsVerifiedAdmin($admin)
             ->post('/admin/proofs/'.$approvedProof->id.'/approve', ['review_note' => 'Verified in merchant account'])
             ->assertRedirect();
         $this->assertSame('paid', $order->fresh()->payment_status);
@@ -109,10 +107,10 @@ class PaymentTest extends StoreTestCase
     public function test_admin_can_simulate_sandbox_payment_only_when_enabled_in_testing(): void
     {
         config(['payments.sandbox_enabled' => true]);
-        $admin = User::factory()->create(['role' => 'admin']);
+        $admin = $this->createVerifiedAdmin();
         [$order] = $this->createManualOrder(provider: 'sandbox');
 
-        $this->actingAs($admin)
+        $this->actingAsVerifiedAdmin($admin)
             ->post('/admin/orders/'.$order->public_reference.'/sandbox', ['status' => 'paid'])
             ->assertRedirect();
         $this->assertSame('paid', $order->fresh()->payment_status);
